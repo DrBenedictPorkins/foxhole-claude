@@ -1,0 +1,564 @@
+/**
+ * Modal and Dropdown Manager
+ *
+ * Handles all modal dialogs, dropdown menus, and related UI interactions
+ * for the sidebar. Extracted from sidebar.js for better organization.
+ *
+ * Dependencies:
+ * - DOM elements passed via init() config
+ * - State variables accessed via config.getState() / config.setState()
+ * - Helper functions from sidebar.js (scrollToBottom, escapeHtml, etc.)
+ */
+
+// ============================================================================
+// Module State
+// ============================================================================
+
+/** @type {Object|null} Pending tool confirmation data */
+let pendingConfirmation = null;
+
+/** @type {Object|null} Configuration object with DOM elements and callbacks */
+let config = null;
+
+// ============================================================================
+// Initialization
+// ============================================================================
+
+/**
+ * Initializes the modal manager with required DOM elements and callbacks.
+ *
+ * @param {Object} cfg - Configuration object
+ * @param {Object} cfg.elements - DOM element references
+ * @param {HTMLElement} cfg.elements.clearConfirmModal - Clear confirmation modal
+ * @param {HTMLElement} cfg.elements.confirmModal - Tool confirmation modal
+ * @param {HTMLElement} cfg.elements.confirmAction - Confirmation action text element
+ * @param {HTMLElement} cfg.elements.confirmParams - Confirmation params display element
+ * @param {HTMLElement} cfg.elements.apiKeyModal - API key modal
+ * @param {HTMLElement} cfg.elements.apiKeyInput - API key input field
+ * @param {HTMLElement} cfg.elements.dropdownMenu - Main dropdown menu
+ * @param {HTMLElement} cfg.elements.menuBtn - Menu button
+ * @param {HTMLElement} cfg.elements.autonomyMenu - Autonomy dropdown menu
+ * @param {HTMLElement} cfg.elements.autonomyBtn - Autonomy button
+ * @param {HTMLElement} cfg.elements.autonomyLabel - Autonomy label text
+ * @param {NodeList} cfg.elements.autonomyOptions - Autonomy option buttons
+ * @param {HTMLElement} cfg.elements.chatContainer - Chat messages container
+ * @param {HTMLElement} cfg.elements.userInput - User input textarea
+ * @param {HTMLElement} cfg.elements.imagePreview - Image preview element
+ * @param {HTMLElement} cfg.elements.imagePreviewContainer - Image preview container
+ * @param {HTMLElement} [cfg.elements.attachMenu] - Attachment menu (optional)
+ * @param {Object} cfg.callbacks - Callback functions
+ * @param {Function} cfg.callbacks.getState - Returns current state object
+ * @param {Function} cfg.callbacks.setState - Updates state
+ * @param {Function} cfg.callbacks.scrollToBottom - Scrolls chat to bottom
+ * @param {Function} cfg.callbacks.getWelcomeMessageHtml - Returns welcome HTML
+ * @param {Function} cfg.callbacks.attachPromptButtonListeners - Attaches prompt listeners
+ * @param {Function} cfg.callbacks.clearPendingImage - Clears pending image
+ * @param {Function} cfg.callbacks.updateTokenUsage - Updates token display
+ * @param {Function} cfg.callbacks.handleInputChange - Handles input state change
+ * @param {Function} cfg.callbacks.addSystemMessage - Adds system message to chat
+ * @param {Function} cfg.callbacks.addAssistantMessage - Adds assistant message to chat
+ * @param {Function} cfg.callbacks.saveCurrentTabState - Saves current tab state
+ */
+function init(cfg) {
+  config = cfg;
+}
+
+// ============================================================================
+// Clear Chat Modal
+// ============================================================================
+
+/**
+ * Shows the clear chat confirmation modal.
+ */
+function showClearConfirmModal() {
+  config.elements.clearConfirmModal.classList.remove('hidden');
+}
+
+/**
+ * Hides the clear chat confirmation modal.
+ */
+function hideClearConfirmModal() {
+  config.elements.clearConfirmModal.classList.add('hidden');
+}
+
+/**
+ * Handles the confirmed clear chat action.
+ * Clears conversation, resets token usage, and restores welcome message.
+ */
+function handleClearChatConfirmed() {
+  const state = config.callbacks.getState();
+
+  // Reset conversation state (including lastTurnTokens for proper display)
+  config.callbacks.setState({
+    conversation: [],
+    tokenUsage: { input: 0, output: 0, cacheCreation: 0, cacheRead: 0 },
+    lastTurnTokens: { input: 0, output: 0, cacheCreation: 0, cacheRead: 0 }
+  });
+
+  config.callbacks.refreshTokenDisplay();
+  config.elements.chatContainer.innerHTML = config.callbacks.getWelcomeMessageHtml();
+  config.callbacks.attachPromptButtonListeners();
+
+  // Clear any pending image
+  config.callbacks.clearPendingImage();
+
+  // Update the stored state for this tab
+  if (state.currentTabId) {
+    const tabConversations = state.tabConversations;
+    tabConversations.set(state.currentTabId, {
+      conversation: [],
+      tokenUsage: { input: 0, output: 0, cacheCreation: 0, cacheRead: 0 },
+      lastTurnTokens: { input: 0, output: 0, cacheCreation: 0, cacheRead: 0 },
+      chatHtml: null
+    });
+  }
+
+  hideClearConfirmModal();
+}
+
+// ============================================================================
+// Tool Confirmation Modal
+// ============================================================================
+
+/**
+ * Shows the tool confirmation modal for high-risk tool execution.
+ *
+ * @param {string} toolName - Name of the tool to execute
+ * @param {Object} toolInput - Input parameters for the tool
+ * @param {string} toolId - Unique identifier for the tool call
+ */
+function showConfirmationModal(toolName, toolInput, toolId) {
+  pendingConfirmation = { toolName, toolInput, toolId };
+
+  config.elements.confirmAction.textContent = `Claude wants to execute: ${toolName}`;
+  config.elements.confirmParams.textContent = JSON.stringify(toolInput, null, 2);
+  config.elements.confirmModal.classList.remove('hidden');
+}
+
+/**
+ * Handles cancellation of tool confirmation.
+ * Sends rejection message to background script.
+ */
+function handleConfirmCancel() {
+  if (pendingConfirmation) {
+    browser.runtime.sendMessage({
+      type: 'TOOL_CONFIRMATION',
+      toolId: pendingConfirmation.toolId,
+      approved: false
+    });
+    pendingConfirmation = null;
+  }
+  config.elements.confirmModal.classList.add('hidden');
+}
+
+/**
+ * Handles approval of tool confirmation.
+ * Sends approval message to background script.
+ */
+function handleConfirmApprove() {
+  if (pendingConfirmation) {
+    browser.runtime.sendMessage({
+      type: 'TOOL_CONFIRMATION',
+      toolId: pendingConfirmation.toolId,
+      approved: true
+    });
+    pendingConfirmation = null;
+  }
+  config.elements.confirmModal.classList.add('hidden');
+}
+
+// ============================================================================
+// API Key Modal
+// ============================================================================
+
+/**
+ * Shows the API key configuration modal.
+ */
+function showApiKeyModal() {
+  config.elements.apiKeyModal.classList.remove('hidden');
+  config.elements.apiKeyInput.focus();
+}
+
+/**
+ * Handles saving and validating the API key.
+ * Validates format, tests against Anthropic API, and stores if valid.
+ */
+async function handleApiKeySave() {
+  const apiKey = config.elements.apiKeyInput.value.trim();
+  const statusEl = document.getElementById('api-key-status');
+  const saveBtn = document.getElementById('api-key-save');
+
+  // Reset state
+  config.elements.apiKeyInput.classList.remove('error', 'success');
+  statusEl.classList.remove('visible', 'error', 'success', 'validating');
+
+  // Basic format validation
+  if (!apiKey) {
+    showApiKeyError('Please enter an API key');
+    return;
+  }
+
+  if (!apiKey.startsWith('sk-ant-')) {
+    showApiKeyError('Invalid format. Anthropic API keys start with "sk-ant-"');
+    return;
+  }
+
+  // Show validating state
+  statusEl.textContent = 'Validating API key...';
+  statusEl.classList.add('visible', 'validating');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Validating...';
+
+  try {
+    // Validate against Anthropic API
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-haiku-20241022',
+        max_tokens: 10,
+        messages: [{ role: 'user', content: 'Hi' }]
+      })
+    });
+
+    if (response.ok) {
+      // Success - save the key
+      await browser.storage.local.set({ apiKey, apiKeyStatus: 'valid' });
+      config.callbacks.setState({ apiKeyConfigured: true });
+
+      // Show success briefly
+      config.elements.apiKeyInput.classList.add('success');
+      statusEl.textContent = 'API key validated successfully!';
+      statusEl.classList.remove('validating');
+      statusEl.classList.add('success');
+
+      // Notify background script
+      browser.runtime.sendMessage({ type: 'API_KEY_UPDATED' });
+
+      // Close modal after brief delay
+      setTimeout(() => {
+        config.elements.apiKeyModal.classList.add('hidden');
+        config.elements.apiKeyInput.value = '';
+        config.elements.apiKeyInput.classList.remove('success');
+        statusEl.classList.remove('visible', 'success');
+      }, 1000);
+
+    } else {
+      // API returned an error
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = errorData.error?.message || `HTTP ${response.status}`;
+      showApiKeyError(`Invalid API key: ${errorMessage}`);
+    }
+
+  } catch (error) {
+    console.error('API key validation failed:', error);
+    showApiKeyError(`Connection failed: ${error.message}`);
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save API Key';
+  }
+}
+
+/**
+ * Shows an API key validation error and focuses input for retry.
+ *
+ * @param {string} message - Error message to display
+ */
+function showApiKeyError(message) {
+  const statusEl = document.getElementById('api-key-status');
+
+  config.elements.apiKeyInput.classList.remove('success', 'validating');
+  config.elements.apiKeyInput.classList.add('error');
+
+  statusEl.textContent = message;
+  statusEl.classList.remove('validating', 'success');
+  statusEl.classList.add('visible', 'error');
+
+  // Select all text and focus for easy re-paste
+  config.elements.apiKeyInput.select();
+  config.elements.apiKeyInput.focus();
+}
+
+// ============================================================================
+// Autonomy Dropdown
+// ============================================================================
+
+/**
+ * Toggles the main dropdown menu visibility.
+ *
+ * @param {Event} e - Click event
+ */
+function toggleDropdownMenu(e) {
+  e.stopPropagation();
+  config.elements.dropdownMenu.classList.toggle('hidden');
+  config.elements.autonomyMenu.classList.add('hidden');
+  if (config.elements.attachMenu) {
+    config.elements.attachMenu.classList.add('hidden');
+  }
+}
+
+/**
+ * Toggles the autonomy mode dropdown menu.
+ *
+ * @param {Event} e - Click event
+ */
+function toggleAutonomyMenu(e) {
+  e.stopPropagation();
+  config.elements.autonomyMenu.classList.toggle('hidden');
+  config.elements.autonomyBtn.classList.toggle('open');
+  config.elements.dropdownMenu.classList.add('hidden');
+  if (config.elements.attachMenu) {
+    config.elements.attachMenu.classList.add('hidden');
+  }
+}
+
+/**
+ * Handles autonomy mode change from dropdown selection.
+ * Updates UI, saves to tab state, and notifies background.
+ *
+ * @param {Event} e - Click event from autonomy option
+ */
+async function handleAutonomyChange(e) {
+  const option = e.currentTarget;
+  const mode = option.dataset.mode;
+  const state = config.callbacks.getState();
+
+  config.callbacks.setState({ autonomyMode: mode });
+  updateAutonomyUI();
+
+  // Save to current tab's state (not global storage)
+  if (state.currentTabId) {
+    const tabState = state.tabConversations.get(state.currentTabId);
+    if (tabState) {
+      tabState.autonomyMode = mode;
+    }
+  }
+
+  // Notify background script of the change for this tab
+  browser.runtime.sendMessage({
+    type: 'SET_AUTONOMY_MODE',
+    mode: mode,
+    tabId: state.currentTabId
+  });
+
+  // Hide menu
+  config.elements.autonomyMenu.classList.add('hidden');
+  config.elements.autonomyBtn.classList.remove('open');
+}
+
+/**
+ * Updates the autonomy UI to reflect current mode.
+ * Updates button label, selected option, and risk banner visibility.
+ */
+function updateAutonomyUI() {
+  // Guard: config may not be initialized yet if called early
+  if (!config) return;
+
+  const state = config.callbacks.getState();
+  const autonomyMode = state.autonomyMode;
+
+  // Update button label
+  config.elements.autonomyLabel.textContent = autonomyMode === 'ask'
+    ? 'Ask before acting'
+    : 'Act without asking';
+
+  // Update selected option
+  config.elements.autonomyOptions.forEach(option => {
+    if (option.dataset.mode === autonomyMode) {
+      option.classList.add('selected');
+    } else {
+      option.classList.remove('selected');
+    }
+  });
+
+  // Show/hide risk banner based on mode
+  const riskBanner = document.getElementById('risk-banner');
+  if (riskBanner) {
+    if (autonomyMode === 'auto') {
+      riskBanner.classList.remove('hidden');
+    } else {
+      riskBanner.classList.add('hidden');
+    }
+  }
+}
+
+// ============================================================================
+// Attachment / Image Handling
+// ============================================================================
+
+/**
+ * Handles attach button click - opens file picker for images.
+ */
+function handleAttachClick() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      await processImageFile(file);
+    }
+  };
+  input.click();
+}
+
+/**
+ * Handles paste event to detect and process clipboard images.
+ *
+ * @param {ClipboardEvent} e - Paste event
+ */
+async function handlePaste(e) {
+  const items = e.clipboardData?.items;
+  if (!items) return;
+
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      e.preventDefault();
+      const file = item.getAsFile();
+      if (file) {
+        await processImageFile(file);
+      }
+      return;
+    }
+  }
+}
+
+/**
+ * Processes an image file from paste or file picker.
+ * Converts to base64 and stores as pending image for next message.
+ *
+ * @param {File} file - Image file to process
+ */
+async function processImageFile(file) {
+  try {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      const base64Match = dataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
+
+      if (base64Match) {
+        const mediaType = base64Match[1];
+        const base64Data = base64Match[2];
+
+        // Store pending image
+        config.callbacks.setState({
+          pendingImage: {
+            mediaType: mediaType,
+            base64: base64Data
+          }
+        });
+
+        // Show preview
+        config.elements.imagePreview.src = dataUrl;
+        config.elements.imagePreviewContainer.classList.remove('hidden');
+
+        // Enable send button
+        config.callbacks.handleInputChange();
+
+        // Focus input for user to add optional text
+        config.elements.userInput.focus();
+      }
+    };
+    reader.readAsDataURL(file);
+  } catch (error) {
+    console.error('Failed to process image:', error);
+  }
+}
+
+/**
+ * Handles remove image button click.
+ */
+function handleRemoveImage() {
+  clearPendingImage();
+}
+
+/**
+ * Clears pending image and hides preview.
+ */
+function clearPendingImage() {
+  config.callbacks.setState({ pendingImage: null });
+  config.elements.imagePreview.src = '';
+  config.elements.imagePreviewContainer.classList.add('hidden');
+  config.callbacks.handleInputChange();
+}
+
+// ============================================================================
+// Outside Click Handler
+// ============================================================================
+
+/**
+ * Handles clicks outside dropdowns to close them.
+ *
+ * @param {Event} e - Click event
+ */
+function handleOutsideClick(e) {
+  if (!config.elements.dropdownMenu.contains(e.target) &&
+      !config.elements.menuBtn.contains(e.target)) {
+    config.elements.dropdownMenu.classList.add('hidden');
+  }
+
+  if (!config.elements.autonomyMenu.contains(e.target) &&
+      !config.elements.autonomyBtn.contains(e.target)) {
+    config.elements.autonomyMenu.classList.add('hidden');
+    config.elements.autonomyBtn.classList.remove('open');
+  }
+}
+
+// ============================================================================
+// Export for MV2 Compatibility
+// ============================================================================
+
+/**
+ * Modal Manager - handles all modal and dropdown interactions
+ * @namespace
+ */
+window.ModalManager = {
+  // Initialization
+  init,
+
+  // Clear chat modal
+  clearChat: {
+    show: showClearConfirmModal,
+    hide: hideClearConfirmModal,
+    handleConfirm: handleClearChatConfirmed
+  },
+
+  // Tool confirmation modal
+  confirm: {
+    show: showConfirmationModal,
+    cancel: handleConfirmCancel,
+    approve: handleConfirmApprove
+  },
+
+  // API key modal
+  apiKey: {
+    show: showApiKeyModal,
+    save: handleApiKeySave,
+    showError: showApiKeyError
+  },
+
+  // Autonomy dropdown
+  autonomy: {
+    toggleDropdown: toggleDropdownMenu,
+    toggleMenu: toggleAutonomyMenu,
+    handleChange: handleAutonomyChange,
+    updateUI: updateAutonomyUI
+  },
+
+  // Attachment / image handling
+  attach: {
+    handleClick: handleAttachClick,
+    handlePaste: handlePaste,
+    processImage: processImageFile,
+    remove: handleRemoveImage,
+    clear: clearPendingImage
+  },
+
+  // Utility
+  handleOutsideClick
+};

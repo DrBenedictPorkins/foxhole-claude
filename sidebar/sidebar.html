@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Foxhole for Claude</title>
+  <link rel="stylesheet" href="sidebar.css">
+</head>
+<body>
+  <div class="sidebar-container">
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <select id="model-select" class="model-select">
+          <option value="claude-haiku-4-5" selected>Haiku 4.5</option>
+          <option value="claude-sonnet-4-5">Sonnet 4.5</option>
+          <option value="claude-opus-4-5">Opus 4.5</option>
+        </select>
+        <span id="token-display" class="token-display" title="Token usage">0k tokens</span>
+        <span class="toolbar-separator">|</span>
+        <span id="tab-info" class="tab-info" title="Current tab">
+          <svg class="tab-info-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="2" y1="12" x2="22" y2="12"/>
+            <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>
+          </svg>
+          <span id="tab-info-text">Loading...</span>
+        </span>
+      </div>
+      <div class="toolbar-right">
+        <button id="notes-btn" class="toolbar-btn" title="Site Specs">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+            <polyline points="14,2 14,8 20,8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+            <polyline points="10,9 9,9 8,9"/>
+          </svg>
+          <span id="notes-badge" class="toolbar-badge hidden">0</span>
+        </button>
+        <button id="clear-chat-btn" class="toolbar-btn" title="Clear chat">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+          </svg>
+        </button>
+        <button id="menu-btn" class="toolbar-btn" title="Menu">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="12" cy="5" r="2"/>
+            <circle cx="12" cy="12" r="2"/>
+            <circle cx="12" cy="19" r="2"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Dropdown Menu -->
+    <div id="dropdown-menu" class="dropdown-menu hidden">
+      <button id="settings-menu-btn" class="dropdown-item">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+        </svg>
+        <span>Settings</span>
+      </button>
+      <button id="export-context-btn" class="dropdown-item">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+          <polyline points="7,10 12,15 17,10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        <span>Export Context</span>
+      </button>
+    </div>
+
+    <!-- Chat Container -->
+    <div id="chat-container" class="chat-container">
+      <div class="welcome-message">
+        <div class="welcome-icon">
+          <img src="../icons/icon-48.png" alt="Claude">
+        </div>
+        <h2>Welcome to Foxhole for Claude</h2>
+        <p class="welcome-intro">I'm Claude with full browser control. Unlike scripts, I understand context and adapt.</p>
+        <ul class="welcome-capabilities">
+          <li><strong>Your Session</strong> - I act as you, using your logged-in cookies and auth</li>
+          <li><strong>API Discovery</strong> - Capture network traffic, I'll reverse-engineer private APIs</li>
+          <li><strong>Full DOM Access</strong> - Read, modify, and extract from page structure directly</li>
+          <li><strong>Site Memory</strong> - I learn and remember selectors, quirks, and patterns per-site</li>
+          <li><strong>Multi-step Chains</strong> - Complex workflows across pages with persistent context</li>
+        </ul>
+        <p class="welcome-tip">Try these to get started:</p>
+        <div class="welcome-prompts">
+          <button class="prompt-btn" data-prompt="Monitor network traffic as I browse this site. Summarize API endpoints, methods, and request patterns. For large payloads, just note the structure - don't dump raw data. I want to understand how to replicate this site's functionality programmatically.">
+            🔍 Record API Traffic
+          </button>
+          <button class="prompt-btn" data-prompt="Analyze the network calls captured so far. Document the internal APIs: list endpoints, auth headers, request formats, and response structures. Create a quick reference I can use to call these APIs directly.">
+            📋 Document APIs
+          </button>
+          <button class="prompt-btn" data-prompt="Analyze this page's DOM structure and document the key selectors for: navigation, search, product/item listings, forms, and interactive elements. Save as site specs for future reference.">
+            🗺️ Map DOM Structure
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Risk Warning Banner (shown in auto mode) -->
+    <div id="risk-banner" class="risk-banner hidden">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2L1 21h22L12 2zm0 3.99L19.53 19H4.47L12 5.99zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z"/>
+      </svg>
+      <span>Auto mode: Claude will take actions without confirmation</span>
+    </div>
+
+    <!-- Input Area -->
+    <div class="input-area">
+      <!-- Image Preview (for pasted/attached images) -->
+      <div id="image-preview-container" class="image-preview-container hidden">
+        <div class="image-preview-wrapper">
+          <img id="image-preview" class="image-preview" alt="Pasted image">
+          <button id="remove-image-btn" class="remove-image-btn" title="Remove image">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="input-wrapper">
+        <textarea
+          id="user-input"
+          class="user-input"
+          placeholder="Ask Claude anything..."
+          rows="1"
+        ></textarea>
+      </div>
+      <div class="input-controls">
+        <!-- Autonomy Mode Dropdown -->
+        <div class="autonomy-wrapper">
+          <button id="autonomy-btn" class="autonomy-toggle">
+            <span id="autonomy-icon" class="autonomy-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8 5v14l11-7z"/>
+              </svg>
+            </span>
+            <span id="autonomy-label">Ask before acting</span>
+            <svg class="dropdown-caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6,9 12,15 18,9"/>
+            </svg>
+          </button>
+          <div id="autonomy-menu" class="autonomy-menu hidden">
+            <button data-mode="ask" class="autonomy-option selected">
+              <span class="option-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/>
+                  <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/>
+                  <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+              </span>
+              <div class="option-text">
+                <strong>Ask before acting</strong>
+                <span>Claude aligns on its approach before taking actions</span>
+              </div>
+              <span class="checkmark">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                  <polyline points="20,6 9,17 4,12"/>
+                </svg>
+              </span>
+            </button>
+            <button data-mode="auto" class="autonomy-option">
+              <span class="option-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M8 5v14l11-7z"/>
+                </svg>
+              </span>
+              <div class="option-text">
+                <strong>Act without asking</strong>
+                <span>Claude takes actions without asking for permission</span>
+              </div>
+              <span class="checkmark">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                  <polyline points="20,6 9,17 4,12"/>
+                </svg>
+              </span>
+            </button>
+          </div>
+        </div>
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+          <!-- Preset Prompts Menu -->
+          <div class="prompts-menu-wrapper">
+            <button id="prompts-menu-btn" class="input-btn prompts-btn" title="Quick prompts">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="4" y1="6" x2="20" y2="6"/>
+                <line x1="4" y1="12" x2="20" y2="12"/>
+                <line x1="4" y1="18" x2="20" y2="18"/>
+              </svg>
+            </button>
+            <div id="prompts-dropdown" class="prompts-dropdown hidden">
+              <button class="prompt-item" data-prompt="What's on this page? Give me a quick summary.">Analyze Page</button>
+              <button class="prompt-item" data-prompt="Let me select some items on this page visually.">Visual Selection</button>
+              <button class="prompt-item" data-prompt="Take a screenshot of what I'm looking at.">Screenshot</button>
+              <div class="prompt-divider"></div>
+              <button class="prompt-item" data-prompt="Monitor network traffic as I browse this site. Summarize API endpoints, methods, and request patterns. For large payloads, just note the structure - don't dump raw data.">Record API Traffic</button>
+              <button class="prompt-item" data-prompt="Analyze the network calls captured so far. Document the internal APIs: list endpoints, auth headers, request formats, and response structures.">Document APIs</button>
+              <button class="prompt-item" data-prompt="Analyze this page's DOM structure and document the key selectors for: navigation, search, product/item listings, forms, and interactive elements. Save as site specs.">Map DOM Structure</button>
+            </div>
+          </div>
+          <button id="screenshot-btn" class="input-btn screenshot-btn" title="Take screenshot">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="5" width="18" height="14" rx="2"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+          <button id="send-btn" class="send-btn" title="Send message" disabled>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="12" y1="19" x2="12" y2="5"/>
+              <polyline points="5,12 12,5 19,12"/>
+            </svg>
+          </button>
+          <button id="stop-btn" class="stop-btn hidden" title="Stop generation">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="6" y="6" width="12" height="12" rx="2"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer Disclaimer -->
+    <footer class="disclaimer">
+      Claude is AI and can make mistakes. Please double-check responses.
+    </footer>
+  </div>
+
+  <!-- Confirmation Modal -->
+  <div id="confirm-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Confirm Action</h3>
+      </div>
+      <div class="modal-body">
+        <p id="confirm-action" class="confirm-action"></p>
+        <div class="confirm-params-wrapper">
+          <pre id="confirm-params" class="confirm-params"></pre>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="confirm-cancel" class="modal-btn cancel-btn">Cancel</button>
+        <button id="confirm-approve" class="modal-btn approve-btn">Approve</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Shortcut Modal -->
+  <div id="shortcut-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content shortcut-modal-content">
+      <div class="modal-header">
+        <h3>Create shortcut</h3>
+        <button id="shortcut-close" class="modal-close-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="shortcut-name">Name</label>
+          <input type="text" id="shortcut-name" class="form-input" placeholder="/my-shortcut">
+        </div>
+        <div class="form-group">
+          <label for="shortcut-prompt">Prompt</label>
+          <textarea id="shortcut-prompt" class="form-textarea" placeholder="Describe what this shortcut should do..."></textarea>
+        </div>
+        <div class="form-group">
+          <label for="shortcut-url">Start from</label>
+          <input type="text" id="shortcut-url" class="form-input" placeholder="https://example.com">
+        </div>
+        <div class="form-group form-row">
+          <label for="shortcut-schedule">Schedule</label>
+          <label class="toggle-switch">
+            <input type="checkbox" id="shortcut-schedule">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="shortcut-cancel" class="modal-btn cancel-btn">Cancel</button>
+        <button id="shortcut-create" class="modal-btn approve-btn">Create shortcut</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Clear Chat Confirmation Modal -->
+  <div id="clear-confirm-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Clear Chat</h3>
+      </div>
+      <div class="modal-body">
+        <p>This will clear all messages and start a new conversation. This action cannot be undone.</p>
+      </div>
+      <div class="modal-footer">
+        <button id="clear-confirm-cancel" class="modal-btn cancel-btn">Cancel</button>
+        <button id="clear-confirm-approve" class="modal-btn danger-btn">Clear All</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- API Key Setup Modal -->
+  <div id="api-key-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>API Key Required</h3>
+      </div>
+      <div class="modal-body">
+        <p>Please enter your Anthropic API key to use Foxhole for Claude.</p>
+        <div class="form-group">
+          <label for="api-key-input">API Key</label>
+          <input type="password" id="api-key-input" class="form-input" placeholder="sk-ant-...">
+          <div id="api-key-status" class="api-key-status"></div>
+        </div>
+        <p class="help-text">Your API key is stored locally and never sent to any server except Anthropic's API.</p>
+      </div>
+      <div class="modal-footer">
+        <button id="api-key-save" class="modal-btn approve-btn">Save API Key</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Site Specs Modal -->
+  <div id="notes-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content notes-modal-content">
+      <div class="modal-header">
+        <h3>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+            <polyline points="14,2 14,8 20,8"/>
+          </svg>
+          Site Specs
+          <span id="notes-domain" class="notes-domain"></span>
+        </h3>
+        <button id="notes-close" class="modal-close-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="notes-toolbar">
+        <div class="notes-view-toggle">
+          <button id="notes-view-rendered" class="notes-view-btn active" title="Rendered view">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+          <button id="notes-view-source" class="notes-view-btn" title="Markdown source">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="16,18 22,12 16,6"/>
+              <polyline points="8,6 2,12 8,18"/>
+            </svg>
+          </button>
+        </div>
+        <button id="notes-clear-all" class="notes-clear-btn" title="Clear all specs for this site">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+          </svg>
+          Clear All
+        </button>
+      </div>
+      <div class="modal-body notes-body">
+        <div id="notes-rendered" class="notes-content notes-rendered"></div>
+        <div id="notes-source" class="notes-content notes-source hidden">
+          <textarea id="notes-markdown" class="notes-markdown" placeholder="Edit specs in markdown format..."></textarea>
+          <div class="notes-source-actions">
+            <button id="notes-save-source" class="modal-btn approve-btn">Save Changes</button>
+          </div>
+        </div>
+        <div id="notes-empty" class="notes-empty hidden">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+            <polyline points="14,2 14,8 20,8"/>
+          </svg>
+          <p>No specs for this site yet.</p>
+          <span>Specs are automatically created when Claude discovers DOM patterns or APIs.</span>
+        </div>
+      </div>
+      <div class="modal-footer notes-footer">
+        <span id="notes-count" class="notes-count">0 specs</span>
+        <button id="notes-done" class="modal-btn approve-btn">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="lib/marked.min.js"></script>
+  <!-- Modules (load before sidebar.js) -->
+  <script src="modules/helpers.js"></script>
+  <script src="modules/render-utils.js"></script>
+  <script src="modules/tab-manager.js"></script>
+  <script src="modules/activity-log.js"></script>
+  <script src="modules/specs-manager.js"></script>
+  <script src="modules/modal-manager.js"></script>
+  <script src="modules/message-sender.js"></script>
+  <script src="modules/message-handler.js"></script>
+  <script src="modules/stream-renderer.js"></script>
+  <!-- Main sidebar script -->
+  <script src="sidebar.js"></script>
+</body>
+</html>

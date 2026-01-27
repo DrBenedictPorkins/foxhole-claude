@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Foxhole for Claude Report</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    #loading {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      font-size: 18px;
+      color: #888;
+    }
+    #error {
+      display: none;
+      padding: 40px;
+      text-align: center;
+      color: #f87171;
+    }
+  </style>
+</head>
+<body>
+  <div id="loading">Loading...</div>
+  <div id="error"></div>
+  <script src="viewer.js"></script>
+</body>
+</html>

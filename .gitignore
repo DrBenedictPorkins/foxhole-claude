@@ -1,0 +1,57 @@
+# Operating System
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Development Tools
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+.env
+.env.local
+
+# Node & NPM
+node_modules/
+package-lock.json
+npm-debug.log
+npm-error.log
+yarn.lock
+.npm/
+
+# Build & Distribution
+web-ext-artifacts/
+dist/
+build/
+*.xpi
+*.zip
+
+# Logs
+*.log
+logs/
+
+# Project-specific
+.cc_checkpoint
+.review-archive/
+.claude/
+.claude-sessions/
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*.swo
+*~
+
+# IDE
+.editorconfig
+.jshintrc
+.eslintrc*
+.prettierrc

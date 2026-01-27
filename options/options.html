@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Foxhole for Claude - Settings</title>
+  <style>
+    /* CSS Variables - matching sidebar theme */
+    :root {
+      --header-bg: #8B1538;
+      --header-text: #ffffff;
+      --page-bg: #0d0d0d;
+      --card-bg: #1a1a1a;
+      --input-bg: #2d2d2d;
+      --input-border: #3d3d3d;
+      --text-primary: #ffffff;
+      --text-secondary: #888888;
+      --text-muted: #666666;
+      --border-color: #3d3d3d;
+      --accent-color: #C4A052;
+      --accent-hover: #D4B062;
+      --error-color: #ef4444;
+      --success-color: #22c55e;
+      --warning-color: #f59e0b;
+      --link-color: #60a5fa;
+    }
+
+    /* Reset and Base */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--text-primary);
+      background: var(--page-bg);
+      min-height: 100vh;
+    }
+
+    /* Header */
+    .header {
+      background: var(--header-bg);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-icon {
+      width: 32px;
+      height: 32px;
+    }
+
+    .header-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--header-text);
+    }
+
+    /* Main Container */
+    .container {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    /* Section Cards */
+    .section {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .section-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    /* Form Groups */
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group:last-child {
+      margin-bottom: 0;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+    }
+
+    .form-description {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    /* Input Fields */
+    .form-input {
+      width: 100%;
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 14px;
+      color: var(--text-primary);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .form-input:focus {
+      border-color: var(--accent-color);
+    }
+
+    .form-input.error {
+      border-color: var(--error-color);
+      background: rgba(239, 68, 68, 0.1);
+    }
+
+    .form-input.success {
+      border-color: var(--success-color);
+      background: rgba(34, 197, 94, 0.1);
+    }
+
+    .form-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .form-input[type="number"] {
+      width: 120px;
+    }
+
+    /* API Key Input with Toggle */
+    .api-key-wrapper {
+      display: flex;
+      gap: 8px;
+    }
+
+    .api-key-wrapper .form-input {
+      flex: 1;
+      font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+    }
+
+    .toggle-visibility-btn {
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .toggle-visibility-btn:hover {
+      background: var(--border-color);
+      color: var(--text-primary);
+    }
+
+    /* Test Connection Button and Status */
+    .api-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .test-btn {
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 13px;
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .test-btn:hover:not(:disabled) {
+      background: var(--border-color);
+    }
+
+    .test-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .api-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+    }
+
+    .status-indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .status-indicator.untested {
+      background: var(--text-muted);
+    }
+
+    .status-indicator.valid {
+      background: var(--success-color);
+    }
+
+    .status-indicator.invalid {
+      background: var(--error-color);
+    }
+
+    .status-indicator.testing {
+      background: var(--warning-color);
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .status-text {
+      color: var(--text-secondary);
+    }
+
+    .status-text.valid {
+      color: var(--success-color);
+    }
+
+    .status-text.invalid {
+      color: var(--error-color);
+    }
+
+    /* Select Dropdown */
+    .form-select {
+      width: 100%;
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 14px;
+      color: var(--text-primary);
+      outline: none;
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='%23888888'%3E%3Cpath d='M6 8L2 4h8L6 8z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 36px;
+    }
+
+    .form-select:focus {
+      border-color: var(--accent-color);
+    }
+
+    /* Checkbox List */
+    .checkbox-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .checkbox-item input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--accent-color);
+      cursor: pointer;
+    }
+
+    .checkbox-item label {
+      font-size: 13px;
+      color: var(--text-primary);
+      cursor: pointer;
+    }
+
+    .checkbox-item .tool-name {
+      font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+      background: var(--input-bg);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+
+    /* Toggle Switch */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: var(--input-bg);
+      border: 1px solid var(--input-border);
+      border-radius: 24px;
+      transition: 0.3s;
+    }
+
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 2px;
+      bottom: 2px;
+      background-color: var(--text-secondary);
+      border-radius: 50%;
+      transition: 0.3s;
+    }
+
+    input:checked + .toggle-slider {
+      background-color: var(--accent-color);
+      border-color: var(--accent-color);
+    }
+
+    input:checked + .toggle-slider:before {
+      transform: translateX(20px);
+      background-color: white;
+    }
+
+    /* Buttons */
+    .btn-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 8px;
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: none;
+    }
+
+    .btn-primary {
+      background: var(--accent-color);
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: var(--accent-hover);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+    }
+
+    .btn-secondary:hover {
+      background: var(--input-bg);
+    }
+
+    .btn-danger {
+      background: transparent;
+      border: 1px solid var(--error-color);
+      color: var(--error-color);
+    }
+
+    .btn-danger:hover {
+      background: rgba(239, 68, 68, 0.1);
+    }
+
+    /* Save Status */
+    .save-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-top: 16px;
+    }
+
+    .save-status.hidden {
+      display: none;
+    }
+
+    .save-status.success {
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid var(--success-color);
+      color: var(--success-color);
+    }
+
+    .save-status.error {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid var(--error-color);
+      color: var(--error-color);
+    }
+
+    /* Links */
+    .external-link {
+      color: var(--link-color);
+      text-decoration: none;
+      font-size: 13px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .external-link:hover {
+      text-decoration: underline;
+    }
+
+    .external-link svg {
+      width: 12px;
+      height: 12px;
+    }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      padding: 20px;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    .footer a {
+      color: var(--link-color);
+      text-decoration: none;
+    }
+
+    .footer a:hover {
+      text-decoration: underline;
+    }
+
+    /* Responsive */
+    @media (max-width: 480px) {
+      .container {
+        padding: 16px;
+      }
+
+      .section {
+        padding: 16px;
+      }
+
+      .api-key-wrapper {
+        flex-direction: column;
+      }
+
+      .toggle-visibility-btn {
+        align-self: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <img src="../icons/icon-48.png" alt="Foxhole for Claude" class="header-icon">
+    <h1 class="header-title">Foxhole for Claude Settings</h1>
+  </header>
+
+  <div class="container">
+    <!-- API Configuration Section -->
+    <section class="section">
+      <h2 class="section-title">API Configuration</h2>
+
+      <div class="form-group">
+        <label class="form-label" for="api-key">Anthropic API Key</label>
+        <div class="api-key-wrapper">
+          <input type="password" id="api-key" class="form-input" placeholder="sk-ant-...">
+          <button type="button" id="toggle-visibility" class="toggle-visibility-btn" title="Toggle visibility">
+            <svg id="eye-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </div>
+        <div class="api-actions">
+          <button type="button" id="test-connection" class="test-btn">Test Connection</button>
+          <div class="api-status">
+            <span id="status-indicator" class="status-indicator untested"></span>
+            <span id="status-text" class="status-text">Not tested</span>
+          </div>
+        </div>
+        <p class="form-description">
+          <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener" class="external-link">
+            Get your API key from Anthropic Console
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+              <polyline points="15 3 21 3 21 9"/>
+              <line x1="10" y1="14" x2="21" y2="3"/>
+            </svg>
+          </a>
+        </p>
+      </div>
+    </section>
+
+    <!-- Model Settings Section -->
+    <section class="section">
+      <h2 class="section-title">Model Settings</h2>
+
+      <div class="form-group">
+        <label class="form-label" for="default-model">Default Model</label>
+        <select id="default-model" class="form-select">
+          <option value="claude-haiku-4-5" selected>Claude Haiku 4.5</option>
+          <option value="claude-sonnet-4-5">Claude Sonnet 4.5</option>
+          <option value="claude-opus-4-5">Claude Opus 4.5</option>
+        </select>
+        <p class="form-description">Select the default model for conversations</p>
+      </div>
+    </section>
+
+    <!-- Autonomy Settings Section -->
+    <section class="section">
+      <h2 class="section-title">Autonomy Settings</h2>
+
+      <div class="form-group">
+        <label class="form-label" for="autonomy-mode">Default Behavior</label>
+        <select id="autonomy-mode" class="form-select">
+          <option value="ask">Ask before acting</option>
+          <option value="auto">Act without asking</option>
+        </select>
+        <p class="form-description">Control whether Claude asks for confirmation before taking actions</p>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">High-Risk Tools (require confirmation)</label>
+        <p class="form-description">These tools will always prompt for confirmation, even in auto mode</p>
+        <div class="checkbox-list" id="high-risk-tools">
+          <div class="checkbox-item">
+            <input type="checkbox" id="tool-click_element" value="click_element" checked>
+            <label for="tool-click_element"><span class="tool-name">click_element</span> - Click on page elements</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" id="tool-type_text" value="type_text" checked>
+            <label for="tool-type_text"><span class="tool-name">type_text</span> - Type text into inputs</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" id="tool-navigate" value="navigate" checked>
+            <label for="tool-navigate"><span class="tool-name">navigate</span> - Navigate to URLs</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" id="tool-execute_script" value="execute_script" checked>
+            <label for="tool-execute_script"><span class="tool-name">execute_script</span> - Execute JavaScript</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" id="tool-fill_form" value="fill_form" checked>
+            <label for="tool-fill_form"><span class="tool-name">fill_form</span> - Fill form fields</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" id="tool-press_key" value="press_key" checked>
+            <label for="tool-press_key"><span class="tool-name">press_key</span> - Press keyboard keys (can submit forms)</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" id="tool-create_tab" value="create_tab" checked>
+            <label for="tool-create_tab"><span class="tool-name">create_tab</span> - Open new browser tabs</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" id="tool-close_tab" value="close_tab" checked>
+            <label for="tool-close_tab"><span class="tool-name">close_tab</span> - Close browser tabs</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" id="tool-create_markdown" value="create_markdown">
+            <label for="tool-create_markdown"><span class="tool-name">create_markdown</span> - Save markdown files</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" id="tool-create_html" value="create_html">
+            <label for="tool-create_html"><span class="tool-name">create_html</span> - Save HTML reports</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" id="tool-set_cookie" value="set_cookie">
+            <label for="tool-set_cookie"><span class="tool-name">set_cookie</span> - Modify cookies</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" id="tool-delete_cookie" value="delete_cookie">
+            <label for="tool-delete_cookie"><span class="tool-name">delete_cookie</span> - Delete cookies (can log you out)</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" id="tool-clear_storage" value="clear_storage">
+            <label for="tool-clear_storage"><span class="tool-name">clear_storage</span> - Clear browser storage</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" id="tool-write_clipboard" value="write_clipboard">
+            <label for="tool-write_clipboard"><span class="tool-name">write_clipboard</span> - Modify clipboard contents</label>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Advanced Settings Section -->
+    <section class="section">
+      <h2 class="section-title">Advanced Settings</h2>
+
+      <div class="form-group">
+        <label class="form-label" for="max-tokens">Max Tokens</label>
+        <input type="number" id="max-tokens" class="form-input" min="256" max="8192" step="256" value="8192">
+        <p class="form-description">Maximum tokens for API responses (256-8192)</p>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="max-tool-iterations">Max Tool Iterations</label>
+        <input type="number" id="max-tool-iterations" class="form-input" min="1" max="50" step="1" value="15">
+        <p class="form-description">Maximum tool call rounds per message before forcing a summary (1-50). Higher values allow more complex tasks but risk infinite loops.</p>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="temperature">Temperature</label>
+        <input type="number" id="temperature" class="form-input" min="0" max="1" step="0.1" value="0">
+        <p class="form-description">Controls response randomness (0 = deterministic, 1 = creative). Default 0 recommended for automation tasks.</p>
+      </div>
+
+      <div class="form-group">
+        <div class="toggle-row">
+          <div>
+            <label class="form-label">Network Request Capture</label>
+            <p class="form-description">Log network requests for debugging</p>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="network-capture">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Conversation History</label>
+        <p class="form-description">Clear all conversation history from storage</p>
+        <div class="btn-row">
+          <button type="button" id="clear-history" class="btn btn-danger">Clear Conversation History</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Save Button and Status -->
+    <div class="btn-row">
+      <button type="button" id="save-settings" class="btn btn-primary">Save Settings</button>
+      <button type="button" id="reset-defaults" class="btn btn-secondary">Reset to Defaults</button>
+    </div>
+
+    <div id="save-status" class="save-status hidden">
+      <span id="save-status-text"></span>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p>Foxhole for Claude v1.0.0</p>
+    </footer>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
