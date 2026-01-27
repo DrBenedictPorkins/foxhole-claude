@@ -58,4 +58,4 @@ This project is licensed under the MIT License. See [LICENSE](LICENSE) for detai
 
 ## Version
 
-1.0.0
+1.1.0
