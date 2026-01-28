@@ -291,6 +291,7 @@
       tokenUsage: { ...tokenUsage },
       lastTurnTokens: { ...lastTurnTokens },
       chatHtml: chatContainer.innerHTML,
+      scrollTop: chatContainer.scrollTop,
       autonomyMode: autonomyMode
     });
   }
@@ -315,6 +316,12 @@
       if (savedState.chatHtml) {
         chatContainer.innerHTML = savedState.chatHtml;
         reattachChatEventListeners();
+        // Restore scroll position after DOM update
+        if (savedState.scrollTop !== undefined) {
+          requestAnimationFrame(() => {
+            chatContainer.scrollTop = savedState.scrollTop;
+          });
+        }
       } else {
         chatContainer.innerHTML = window.TabManager.getWelcomeMessageHtml();
         window.TabManager.attachPromptButtonListeners(userInput);
@@ -432,7 +439,7 @@
           // Extract media type and base64 from data URL
           const match = result.screenshot.match(/^data:(image\/\w+);base64,(.+)$/);
           if (match) {
-            state.pendingImage = { mediaType: match[1], base64: match[2] };
+            pendingImage = { mediaType: match[1], base64: match[2] };
             imagePreview.src = result.screenshot;
             imagePreviewContainer.classList.remove('hidden');
             handleInputChange();
@@ -956,6 +963,76 @@
       specsManager?.updateBadge();
       updateTabInfo();
     }
+
+    // Check if context compression is needed
+    checkAndCompressContext();
+  }
+
+  async function checkAndCompressContext() {
+    if (!window.ContextManager) return;
+
+    const totalTokens = tokenUsage.input + lastTurnTokens.input;
+    const check = window.ContextManager.checkCompressionNeeded(totalTokens, conversation);
+
+    if (check.needsCompression) {
+      console.log(`[ContextManager] Compression triggered: ${check.reason}`);
+
+      // Save current state BEFORE compression as backup
+      const backupConversation = [...conversation];
+      const backupChatHtml = chatContainer.innerHTML;
+
+      // Show compression notice
+      showSystemMessage(`Compressing conversation history... (${check.reason})`);
+
+      try {
+        const compressed = await window.ContextManager.compressConversation(
+          conversation,
+          async (textToSummarize) => {
+            // Call background to get summary from Claude
+            const response = await browser.runtime.sendMessage({
+              type: 'SUMMARIZE_CONTEXT',
+              text: textToSummarize
+            });
+            return response.summary || 'Previous conversation about browser automation tasks.';
+          }
+        );
+
+        conversation = compressed;
+        // Estimate compressed size (~2k for summary + ~3k per kept pair)
+        const estimatedTokens = 2000 + (window.ContextManager.CONFIG.KEEP_RECENT_PAIRS * 3000);
+        tokenUsage = { input: estimatedTokens, output: 0, cacheCreation: 0, cacheRead: 0 };
+        lastTurnTokens = { input: 0, output: 0, cacheCreation: 0, cacheRead: 0 };
+        refreshTokenDisplay();
+
+        // IMPORTANT: Save tab state immediately to preserve chat UI
+        saveCurrentTabState();
+
+        showSystemMessage(`Context compressed (~${Math.round(estimatedTokens/1000)}k tokens estimated)`);
+        console.log('[ContextManager] Compression complete');
+      } catch (error) {
+        console.error('[ContextManager] Compression failed:', error);
+        // Restore backup if chat was somehow lost
+        if (!chatContainer.innerHTML || chatContainer.innerHTML.includes('welcome-message')) {
+          console.log('[ContextManager] Restoring chat UI from backup');
+          chatContainer.innerHTML = backupChatHtml;
+          conversation = backupConversation;
+        } else {
+          // Fallback: apply sliding window
+          conversation = window.ContextManager.applySlidingWindow(conversation);
+        }
+        saveCurrentTabState();
+      }
+    }
+  }
+
+  function showSystemMessage(text) {
+    const msgElement = document.createElement('div');
+    msgElement.className = 'message system';
+    msgElement.innerHTML = `<div class="message-content"><em>${text}</em></div>`;
+    chatContainer.appendChild(msgElement);
+    window.RenderUtils.scrollToBottom(chatContainer);
+    // Auto-remove after 5 seconds
+    setTimeout(() => msgElement.remove(), 5000);
   }
 
   function handleStreamError(error) {

@@ -407,6 +407,9 @@
       case 'EXPORT_CONTEXT':
         return handleExportContext(payload);
 
+      case 'SUMMARIZE_CONTEXT':
+        return handleSummarizeContext(payload);
+
       default:
         // Only warn for truly unknown messages
         if (type) {
@@ -1571,9 +1574,9 @@ ${rawKnowledge}
 
     // Add current autonomy mode info (per-tab setting)
     if (getAutonomyMode(tabId) === 'auto') {
-      dynamicContext += '\n\nNote: The user has enabled automatic action mode for this tab. You can execute tools without explicit confirmation.';
+      dynamicContext += '\n\nMode: AUTO - Tools execute immediately.';
     } else {
-      dynamicContext += '\n\nNote: The user prefers to confirm actions before execution. Explain what you plan to do and wait for tool results.';
+      dynamicContext += '\n\nMode: CONFIRM - User sees confirmation dialog before tool execution.';
     }
 
     // Return structured array for prompt caching
@@ -2007,6 +2010,45 @@ content: |
     } catch (error) {
       console.error('Error building export context:', error);
       return { error: error.message };
+    }
+  }
+
+  // Summarize conversation context for compression
+  async function handleSummarizeContext(payload) {
+    const { text } = payload;
+
+    if (!claudeApi) {
+      return { summary: 'Previous conversation about browser automation.' };
+    }
+
+    try {
+      console.log('[ContextManager] Requesting summary from Claude...');
+
+      // Use a minimal, fast call to summarize
+      const response = await claudeApi.sendMessage([
+        {
+          role: 'user',
+          content: text
+        }
+      ], []); // No tools needed for summarization
+
+      // Extract text from response
+      let summary = 'Previous conversation about browser automation tasks.';
+      if (response.content) {
+        for (const block of response.content) {
+          if (block.type === 'text') {
+            summary = block.text;
+            break;
+          }
+        }
+      }
+
+      console.log('[ContextManager] Summary generated:', summary.slice(0, 100) + '...');
+      return { summary };
+
+    } catch (error) {
+      console.error('[ContextManager] Summarization failed:', error);
+      return { summary: 'Previous conversation about browser automation tasks.' };
     }
   }
 

@@ -293,10 +293,20 @@ function createViewAsHtmlButton(markdownContent, filename) {
 
       // Convert markdown to HTML using marked (loaded globally in sidebar)
       let htmlContent;
-      if (typeof marked !== 'undefined' && marked.parse) {
-        htmlContent = marked.parse(markdownContent);
-      } else {
-        // Fallback: basic conversion
+      try {
+        if (typeof marked !== 'undefined' && marked.parse) {
+          htmlContent = marked.parse(markdownContent);
+        } else {
+          console.warn('marked library not available, using basic conversion');
+          // Fallback: basic conversion
+          htmlContent = markdownContent
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/\n/g, '<br>');
+        }
+      } catch (parseErr) {
+        console.error('Markdown parse error:', parseErr);
         htmlContent = markdownContent
           .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
@@ -351,8 +361,15 @@ ${htmlContent}
       // Open in new tab - use browser.tabs.create for extension context
       let opened = false;
       if (typeof browser !== 'undefined' && browser.tabs) {
-        await browser.tabs.create({ url: blobUrl });
-        opened = true;
+        try {
+          await browser.tabs.create({ url: blobUrl });
+          opened = true;
+        } catch (tabErr) {
+          console.error('tabs.create failed:', tabErr);
+          // Fallback to window.open
+          const win = window.open(blobUrl, '_blank');
+          opened = win !== null;
+        }
       } else {
         const win = window.open(blobUrl, '_blank');
         opened = win !== null;

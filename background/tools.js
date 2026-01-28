@@ -514,11 +514,11 @@ const BROWSER_TOOLS = [
   },
 
   // ============================================================================
-  // FILE OUTPUT (Markdown preferred, HTML for interactive content)
+  // FILE OUTPUT - ONLY when user explicitly requests
   // ============================================================================
   {
     name: 'create_markdown',
-    description: 'Save markdown to a .md file. PREFERRED over create_html - uses fewer tokens. Only use when user explicitly requests a file/report/export.',
+    description: 'Save markdown file. STOP - only use if user said "save", "export", "report", or "download". Never use to "summarize" or "document" findings - just reply in chat instead.',
     input_schema: {
       type: 'object',
       properties: {
@@ -536,7 +536,7 @@ const BROWSER_TOOLS = [
   },
   {
     name: 'create_html',
-    description: 'Save HTML to a file. Use create_markdown instead unless user specifically needs HTML/interactive content.',
+    description: 'Save HTML file. STOP - only use if user explicitly said "HTML". Otherwise use create_markdown.',
     input_schema: {
       type: 'object',
       properties: {
