@@ -162,6 +162,32 @@ body {
   padding: 4px 8px;
   border-radius: 4px;
   cursor: help;
+  transition: color 0.6s ease, background 0.6s ease;
+}
+
+.token-display.token-pulse {
+  animation: tokenPulse 0.3s ease-out;
+}
+
+@keyframes tokenPulse {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+/* Token usage tiers: warm (50k+), hot (100k+), critical (150k+) */
+.token-display.token-tier-warm {
+  color: var(--warning-color);
+}
+
+.token-display.token-tier-hot {
+  color: var(--warning-color);
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.token-display.token-tier-critical {
+  color: var(--error-color);
+  background: rgba(239, 68, 68, 0.12);
 }
 
 .toolbar-separator {

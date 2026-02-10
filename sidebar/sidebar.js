@@ -1186,37 +1186,49 @@
     const tokenDisplay = document.getElementById('token-display');
     if (!tokenDisplay) return;
 
+    function toK(n) { return `${(n / 1000).toFixed(1)}k`; }
+
     const lastTurnTotal = lastTurnTokens.input + lastTurnTokens.output;
     const cumulativeTotal = tokenUsage.input + tokenUsage.output + lastTurnTotal;
     const cacheRead = tokenUsage.cacheRead + lastTurnTokens.cacheRead;
 
     // Format: "2.3k (+0.8k)" or "2.3k (+0.8k) | 1.2k cached"
-    let displayText = `${(cumulativeTotal / 1000).toFixed(1)}k`;
-    if (lastTurnTotal > 0) {
-      displayText += ` (+${(lastTurnTotal / 1000).toFixed(1)}k)`;
-    }
-    if (cacheRead > 0) {
-      displayText += ` | ${(cacheRead / 1000).toFixed(1)}k cached`;
-    }
+    let displayText = toK(cumulativeTotal);
+    if (lastTurnTotal > 0) displayText += ` (+${toK(lastTurnTotal)})`;
+    if (cacheRead > 0) displayText += ` | ${toK(cacheRead)} cached`;
     tokenDisplay.textContent = displayText;
+
+    // Visual tier based on cumulative token count
+    const tierClasses = ['token-tier-warm', 'token-tier-hot', 'token-tier-critical'];
+    tokenDisplay.classList.remove(...tierClasses);
+    if (cumulativeTotal >= 150000) {
+      tokenDisplay.classList.add('token-tier-critical');
+    } else if (cumulativeTotal >= 100000) {
+      tokenDisplay.classList.add('token-tier-hot');
+    } else if (cumulativeTotal >= 50000) {
+      tokenDisplay.classList.add('token-tier-warm');
+    }
+
+    // Brief scale pulse on update (reflow forces animation restart)
+    tokenDisplay.classList.remove('token-pulse');
+    void tokenDisplay.offsetWidth;
+    tokenDisplay.classList.add('token-pulse');
 
     // Detailed tooltip
     const cumulativeInput = tokenUsage.input + lastTurnTokens.input;
     const cumulativeOutput = tokenUsage.output + lastTurnTokens.output;
     const cacheCreation = tokenUsage.cacheCreation + lastTurnTokens.cacheCreation;
 
-    let tooltip = `Cumulative: ${cumulativeInput.toLocaleString()} in / ${cumulativeOutput.toLocaleString()} out`;
-    tooltip += `\nLast turn: ${lastTurnTokens.input.toLocaleString()} in / ${lastTurnTokens.output.toLocaleString()} out`;
+    const tooltipLines = [
+      `Cumulative: ${cumulativeInput.toLocaleString()} in / ${cumulativeOutput.toLocaleString()} out`,
+      `Last turn: ${lastTurnTokens.input.toLocaleString()} in / ${lastTurnTokens.output.toLocaleString()} out`,
+    ];
     if (cacheRead > 0 || cacheCreation > 0) {
-      tooltip += `\n--- Cache ---`;
-      if (cacheRead > 0) {
-        tooltip += `\nCache read: ${cacheRead.toLocaleString()} tokens`;
-      }
-      if (cacheCreation > 0) {
-        tooltip += `\nCache write: ${cacheCreation.toLocaleString()} tokens`;
-      }
+      tooltipLines.push('--- Cache ---');
+      if (cacheRead > 0) tooltipLines.push(`Cache read: ${cacheRead.toLocaleString()} tokens`);
+      if (cacheCreation > 0) tooltipLines.push(`Cache write: ${cacheCreation.toLocaleString()} tokens`);
     }
-    tokenDisplay.title = tooltip;
+    tokenDisplay.title = tooltipLines.join('\n');
   }
 
   /**
