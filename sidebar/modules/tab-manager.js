@@ -262,7 +262,7 @@ function getWelcomeMessageHtml() {
         <img src="../icons/icon-48.png" alt="Claude">
       </div>
       <h2>Welcome to Foxhole for Claude</h2>
-      <p class="welcome-intro">I'm Claude with full browser control. Unlike scripts, I understand context and adapt.</p>
+      <p class="welcome-intro">Browser assistant with full page control. Unlike scripts, I understand context and adapt.</p>
       <ul class="welcome-capabilities">
         <li><strong>Your Session</strong> - I act as you, using your logged-in cookies and auth</li>
         <li><strong>API Discovery</strong> - Capture network traffic, I'll reverse-engineer private APIs</li>

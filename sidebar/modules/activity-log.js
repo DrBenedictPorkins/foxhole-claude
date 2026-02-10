@@ -11,7 +11,7 @@
 
 /**
  * List of tools considered high-risk.
- * These require confirmation when "Ask before acting" mode is enabled.
+ * These require confirmation in default mode ("Confirm risky actions").
  */
 const DEFAULT_HIGH_RISK_TOOLS = [
   'click_element',
@@ -63,7 +63,7 @@ function createToggleIcon() {
  * @returns {string} HTML string for the badge
  */
 function createHighRiskBadge() {
-  return `<span class="high-risk-badge" title="Requires confirmation when 'Ask before acting' is enabled">
+  return `<span class="high-risk-badge" title="High-risk: requires confirmation in default mode">
     <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
       <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
     </svg>

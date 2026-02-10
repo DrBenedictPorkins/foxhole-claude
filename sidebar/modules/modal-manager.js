@@ -130,6 +130,24 @@ function handleClearChatConfirmed() {
 function showConfirmationModal(toolName, toolInput, toolId) {
   pendingConfirmation = { toolName, toolInput, toolId };
 
+  // Reset mode-switch state from any previous modal
+  const existingWarning = config.elements.confirmModal.querySelector('.confirm-modal-warning');
+  if (existingWarning) existingWarning.remove();
+  const switchBtn = document.getElementById('confirm-switch-mode');
+  if (switchBtn) {
+    switchBtn.textContent = 'Skip all confirmations';
+    switchBtn.className = 'confirm-mode-switch-link';
+  }
+  const switchContainer = config.elements.confirmModal.querySelector('.confirm-mode-switch');
+  if (switchContainer) switchContainer.className = 'confirm-mode-switch';
+
+  // Restore Cancel/Approve visibility
+  document.getElementById('confirm-cancel').style.display = '';
+  document.getElementById('confirm-approve').style.display = '';
+  // Remove any leftover go-back button
+  const goBackBtn = config.elements.confirmModal.querySelector('.confirm-mode-goback');
+  if (goBackBtn) goBackBtn.remove();
+
   config.elements.confirmAction.textContent = `Claude wants to execute: ${toolName}`;
   config.elements.confirmParams.textContent = JSON.stringify(toolInput, null, 2);
   config.elements.confirmModal.classList.remove('hidden');
@@ -164,6 +182,82 @@ function handleConfirmApprove() {
     });
     pendingConfirmation = null;
   }
+  config.elements.confirmModal.classList.add('hidden');
+}
+
+/**
+ * Handles the "Skip all confirmations" link in the confirmation modal.
+ * Two-click flow: first click shows warning, second click executes the switch.
+ */
+function handleConfirmSwitchMode() {
+  const switchBtn = document.getElementById('confirm-switch-mode');
+  if (!switchBtn) return;
+
+  const modalBody = config.elements.confirmModal.querySelector('.modal-body');
+  const existingWarning = modalBody.querySelector('.confirm-modal-warning');
+
+  // First click: show warning, hide Cancel/Approve, promote switch to main action
+  if (!existingWarning) {
+    const warning = document.createElement('div');
+    warning.className = 'confirm-modal-warning';
+    warning.textContent = 'This will approve this action and all future actions without any confirmation. Claude will click, type, navigate, and execute scripts freely. You can re-enable confirmations anytime from the toolbar.';
+    modalBody.insertBefore(warning, modalBody.firstChild);
+
+    // Hide Cancel/Approve
+    document.getElementById('confirm-cancel').style.display = 'none';
+    document.getElementById('confirm-approve').style.display = 'none';
+
+    // Promote switch button to prominent confirm action
+    switchBtn.textContent = 'Confirm: skip all confirmations';
+    switchBtn.className = 'confirm-mode-switch-link confirm-mode-switch-primary';
+    const switchContainer = config.elements.confirmModal.querySelector('.confirm-mode-switch');
+    if (switchContainer) {
+      switchContainer.className = 'confirm-mode-switch confirm-mode-switch-stage2';
+
+      // Add go-back link
+      const goBack = document.createElement('button');
+      goBack.className = 'confirm-mode-goback';
+      goBack.textContent = 'Go back';
+      goBack.addEventListener('click', () => {
+        // Reset to normal state by re-showing the modal with current pending data
+        if (pendingConfirmation) {
+          showConfirmationModal(pendingConfirmation.toolName, pendingConfirmation.toolInput, pendingConfirmation.toolId);
+        }
+      });
+      switchContainer.appendChild(goBack);
+    }
+    return;
+  }
+
+  // Second click: switch mode, approve, and close
+  const state = config.callbacks.getState();
+
+  config.callbacks.setState({ autonomyMode: 'auto' });
+  updateAutonomyUI();
+
+  if (state.currentTabId) {
+    const tabState = state.tabConversations.get(state.currentTabId);
+    if (tabState) {
+      tabState.autonomyMode = 'auto';
+    }
+  }
+
+  browser.runtime.sendMessage({
+    type: 'SET_AUTONOMY_MODE',
+    mode: 'auto',
+    tabId: state.currentTabId
+  });
+
+  // Approve the pending tool
+  if (pendingConfirmation) {
+    browser.runtime.sendMessage({
+      type: 'TOOL_CONFIRMATION',
+      toolId: pendingConfirmation.toolId,
+      approved: true
+    });
+    pendingConfirmation = null;
+  }
+
   config.elements.confirmModal.classList.add('hidden');
 }
 
@@ -364,8 +458,8 @@ function updateAutonomyUI() {
 
   // Update button label
   config.elements.autonomyLabel.textContent = autonomyMode === 'ask'
-    ? 'Ask before acting'
-    : 'Act without asking';
+    ? 'Confirm risky actions'
+    : 'Skip all confirmations';
 
   // Update selected option
   config.elements.autonomyOptions.forEach(option => {
@@ -532,7 +626,8 @@ window.ModalManager = {
   confirm: {
     show: showConfirmationModal,
     cancel: handleConfirmCancel,
-    approve: handleConfirmApprove
+    approve: handleConfirmApprove,
+    switchMode: handleConfirmSwitchMode
   },
 
   // API key modal

@@ -1216,7 +1216,8 @@
 
       const { id, name, input } = toolUse;
 
-      // Check if confirmation needed (uses user's configured high-risk tools list)
+      // In 'ask' mode (default), high-risk tools require confirmation.
+      // In 'auto' mode (skip all), nothing requires confirmation.
       const needsConfirmation = getAutonomyMode(tabId) === 'ask' && configuredHighRiskTools.includes(name);
 
       if (needsConfirmation) {

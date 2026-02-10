@@ -473,6 +473,7 @@
     // Confirmation modal
     confirmCancel.addEventListener('click', window.ModalManager.confirm.cancel);
     confirmApprove.addEventListener('click', window.ModalManager.confirm.approve);
+    document.getElementById('confirm-switch-mode')?.addEventListener('click', window.ModalManager.confirm.switchMode);
 
     // API key modal
     apiKeySave.addEventListener('click', window.ModalManager.apiKey.save);

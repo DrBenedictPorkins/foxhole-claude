@@ -1183,7 +1183,8 @@ body {
 
 .modal-footer {
   display: flex;
-  justify-content: flex-end;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 12px;
   padding: 16px 20px;
   border-top: 1px solid var(--border-color);
@@ -1242,6 +1243,17 @@ body {
   max-height: 200px;
   overflow-y: auto;
 }
+
+/* Confirm Mode Switch */
+.confirm-mode-switch { flex-basis: 100%; text-align: center; padding-top: 12px; border-top: 1px solid var(--border-color); }
+.confirm-mode-switch-stage2 { border-top: none; padding-top: 0; }
+.confirm-mode-switch-link { background: transparent; border: none; color: var(--warning-color); font-size: 12px; cursor: pointer; padding: 4px 8px; width: 100%; }
+.confirm-mode-switch-link:hover { color: var(--text-primary); }
+.confirm-mode-switch-primary { background: var(--warning-color); color: var(--chat-bg); font-size: 14px; font-weight: 500; padding: 10px 20px; border-radius: 8px; }
+.confirm-mode-switch-primary:hover { background: #d97706; color: var(--chat-bg); }
+.confirm-mode-goback { background: transparent; border: none; color: var(--text-muted); font-size: 12px; cursor: pointer; padding: 8px; margin-top: 8px; }
+.confirm-mode-goback:hover { color: var(--text-primary); }
+.confirm-modal-warning { background: rgba(245,158,11,0.1); border: 1px solid var(--warning-color); border-radius: 8px; padding: 12px; margin-bottom: 12px; font-size: 12px; color: var(--text-secondary); line-height: 1.4; }
 
 /* Shortcut Modal Specific */
 .shortcut-modal-content {

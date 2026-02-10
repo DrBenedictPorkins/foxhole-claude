@@ -546,10 +546,10 @@
         <label class="form-label" for="default-model">Default Model</label>
         <select id="default-model" class="form-select">
           <option value="claude-haiku-4-5" selected>Claude Haiku 4.5</option>
-          <option value="claude-sonnet-4-5">Claude Sonnet 4.5</option>
-          <option value="claude-opus-4-5">Claude Opus 4.5</option>
+          <option value="claude-sonnet-4-5">Claude Sonnet 4.5 (beta)</option>
+          <option value="claude-opus-4-5">Claude Opus 4.5 (beta)</option>
         </select>
-        <p class="form-description">Select the default model for conversations</p>
+        <p class="form-description">Haiku is recommended for browser automation. Larger models cost more per tool call with no behavioral adaptation.</p>
       </div>
     </section>
 
@@ -560,15 +560,15 @@
       <div class="form-group">
         <label class="form-label" for="autonomy-mode">Default Behavior</label>
         <select id="autonomy-mode" class="form-select">
-          <option value="ask">Ask before acting</option>
-          <option value="auto">Act without asking</option>
+          <option value="ask">Confirm risky actions</option>
+          <option value="auto">Skip all confirmations</option>
         </select>
-        <p class="form-description">Control whether Claude asks for confirmation before taking actions</p>
+        <p class="form-description">Default: confirms high-risk tools before executing. Skip all: no safety prompts, Claude acts freely.</p>
       </div>
 
       <div class="form-group">
         <label class="form-label">High-Risk Tools (require confirmation)</label>
-        <p class="form-description">These tools will always prompt for confirmation, even in auto mode</p>
+        <p class="form-description">These tools prompt for confirmation in the default mode. Has no effect when "Skip all confirmations" is active.</p>
         <div class="checkbox-list" id="high-risk-tools">
           <div class="checkbox-item">
             <input type="checkbox" id="tool-click_element" value="click_element" checked>
