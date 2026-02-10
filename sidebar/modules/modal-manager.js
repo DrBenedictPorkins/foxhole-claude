@@ -33,6 +33,8 @@ let config = null;
  * @param {HTMLElement} cfg.elements.confirmModal - Tool confirmation modal
  * @param {HTMLElement} cfg.elements.confirmAction - Confirmation action text element
  * @param {HTMLElement} cfg.elements.confirmParams - Confirmation params display element
+ * @param {HTMLElement} cfg.elements.confirmCancel - Confirmation cancel button
+ * @param {HTMLElement} cfg.elements.confirmApprove - Confirmation approve button
  * @param {HTMLElement} cfg.elements.apiKeyModal - API key modal
  * @param {HTMLElement} cfg.elements.apiKeyInput - API key input field
  * @param {HTMLElement} cfg.elements.dropdownMenu - Main dropdown menu
@@ -130,27 +132,42 @@ function handleClearChatConfirmed() {
 function showConfirmationModal(toolName, toolInput, toolId) {
   pendingConfirmation = { toolName, toolInput, toolId };
 
-  // Reset mode-switch state from any previous modal
-  const existingWarning = config.elements.confirmModal.querySelector('.confirm-modal-warning');
-  if (existingWarning) existingWarning.remove();
-  const switchBtn = document.getElementById('confirm-switch-mode');
-  if (switchBtn) {
-    switchBtn.textContent = 'Skip all confirmations';
-    switchBtn.className = 'confirm-mode-switch-link';
-  }
-  const switchContainer = config.elements.confirmModal.querySelector('.confirm-mode-switch');
-  if (switchContainer) switchContainer.className = 'confirm-mode-switch';
-
-  // Restore Cancel/Approve visibility
-  document.getElementById('confirm-cancel').style.display = '';
-  document.getElementById('confirm-approve').style.display = '';
-  // Remove any leftover go-back button
-  const goBackBtn = config.elements.confirmModal.querySelector('.confirm-mode-goback');
-  if (goBackBtn) goBackBtn.remove();
+  resetSwitchModeUI();
 
   config.elements.confirmAction.textContent = `Claude wants to execute: ${toolName}`;
   config.elements.confirmParams.textContent = JSON.stringify(toolInput, null, 2);
   config.elements.confirmModal.classList.remove('hidden');
+}
+
+/**
+ * Resets the "Skip all confirmations" two-click UI back to its initial state.
+ * Called when showing a new confirmation modal or when the user clicks "Go back".
+ */
+function resetSwitchModeUI() {
+  const modal = config.elements.confirmModal;
+
+  // Remove warning banner from any previous stage-2 state
+  const existingWarning = modal.querySelector('.confirm-modal-warning');
+  if (existingWarning) existingWarning.remove();
+
+  // Reset switch button text and class
+  const switchBtn = modal.querySelector('#confirm-switch-mode');
+  if (switchBtn) {
+    switchBtn.textContent = 'Skip all confirmations';
+    switchBtn.className = 'confirm-mode-switch-link';
+  }
+
+  // Reset switch container class
+  const switchContainer = modal.querySelector('.confirm-mode-switch');
+  if (switchContainer) switchContainer.className = 'confirm-mode-switch';
+
+  // Restore Cancel/Approve visibility
+  config.elements.confirmCancel.style.display = '';
+  config.elements.confirmApprove.style.display = '';
+
+  // Remove any leftover go-back button
+  const goBackBtn = modal.querySelector('.confirm-mode-goback');
+  if (goBackBtn) goBackBtn.remove();
 }
 
 /**
@@ -190,10 +207,11 @@ function handleConfirmApprove() {
  * Two-click flow: first click shows warning, second click executes the switch.
  */
 function handleConfirmSwitchMode() {
-  const switchBtn = document.getElementById('confirm-switch-mode');
+  const modal = config.elements.confirmModal;
+  const switchBtn = modal.querySelector('#confirm-switch-mode');
   if (!switchBtn) return;
 
-  const modalBody = config.elements.confirmModal.querySelector('.modal-body');
+  const modalBody = modal.querySelector('.modal-body');
   const existingWarning = modalBody.querySelector('.confirm-modal-warning');
 
   // First click: show warning, hide Cancel/Approve, promote switch to main action
@@ -204,13 +222,13 @@ function handleConfirmSwitchMode() {
     modalBody.insertBefore(warning, modalBody.firstChild);
 
     // Hide Cancel/Approve
-    document.getElementById('confirm-cancel').style.display = 'none';
-    document.getElementById('confirm-approve').style.display = 'none';
+    config.elements.confirmCancel.style.display = 'none';
+    config.elements.confirmApprove.style.display = 'none';
 
     // Promote switch button to prominent confirm action
     switchBtn.textContent = 'Confirm: skip all confirmations';
     switchBtn.className = 'confirm-mode-switch-link confirm-mode-switch-primary';
-    const switchContainer = config.elements.confirmModal.querySelector('.confirm-mode-switch');
+    const switchContainer = modal.querySelector('.confirm-mode-switch');
     if (switchContainer) {
       switchContainer.className = 'confirm-mode-switch confirm-mode-switch-stage2';
 
@@ -218,12 +236,7 @@ function handleConfirmSwitchMode() {
       const goBack = document.createElement('button');
       goBack.className = 'confirm-mode-goback';
       goBack.textContent = 'Go back';
-      goBack.addEventListener('click', () => {
-        // Reset to normal state by re-showing the modal with current pending data
-        if (pendingConfirmation) {
-          showConfirmationModal(pendingConfirmation.toolName, pendingConfirmation.toolInput, pendingConfirmation.toolId);
-        }
-      });
+      goBack.addEventListener('click', resetSwitchModeUI);
       switchContainer.appendChild(goBack);
     }
     return;
@@ -249,16 +262,7 @@ function handleConfirmSwitchMode() {
   });
 
   // Approve the pending tool
-  if (pendingConfirmation) {
-    browser.runtime.sendMessage({
-      type: 'TOOL_CONFIRMATION',
-      toolId: pendingConfirmation.toolId,
-      approved: true
-    });
-    pendingConfirmation = null;
-  }
-
-  config.elements.confirmModal.classList.add('hidden');
+  handleConfirmApprove();
 }
 
 // ============================================================================

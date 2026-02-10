@@ -186,6 +186,8 @@
         confirmModal,
         confirmAction,
         confirmParams,
+        confirmCancel,
+        confirmApprove,
         apiKeyModal,
         apiKeyInput,
         dropdownMenu,

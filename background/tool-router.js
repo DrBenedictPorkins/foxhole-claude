@@ -1281,26 +1281,47 @@ async function handleSaveSiteSpec(tab, params) {
     path: '*'
   };
 
-  // Save via SiteKnowledge (unified API)
+  // Save via SiteKnowledge (unified API) — update if duplicate title exists
   try {
-    if (window.SiteKnowledge) {
-      const saved = await window.SiteKnowledge.add(domain, item);
-      if (saved) {
-        console.log(`[SiteKnowledge] Tool saved spec for ${domain}:`, description);
-        return {
-          success: true,
-          message: `Saved Site Spec for ${domain}: "${description}"`,
-          spec: saved
-        };
-      } else {
-        return {
-          success: false,
-          error: 'Spec was duplicate or invalid - a spec with this title already exists'
-        };
-      }
-    } else {
+    if (!window.SiteKnowledge) {
       return { success: false, error: 'SiteKnowledge module not available' };
     }
+
+    // Check for existing spec with same title
+    const existing = await window.SiteKnowledge.get(domain);
+    const match = existing?.find(e => e.title.toLowerCase() === description.toLowerCase());
+
+    if (match) {
+      // Update existing spec with new content
+      const updated = await window.SiteKnowledge.update(domain, match.id, {
+        type,
+        content,
+        path: '*'
+      });
+      if (updated) {
+        console.log(`[SiteKnowledge] Tool updated spec for ${domain}:`, description);
+        return {
+          success: true,
+          message: `Updated existing spec for ${domain}: "${description}"`,
+          action: 'updated',
+          spec: updated
+        };
+      }
+    }
+
+    // No duplicate — add new
+    const saved = await window.SiteKnowledge.add(domain, item);
+    if (saved) {
+      console.log(`[SiteKnowledge] Tool saved spec for ${domain}:`, description);
+      return {
+        success: true,
+        message: `Saved new spec for ${domain}: "${description}"`,
+        action: 'created',
+        spec: saved
+      };
+    }
+
+    return { success: false, error: 'Failed to save spec' };
   } catch (error) {
     console.error('[SiteKnowledge] Tool error:', error);
     return { success: false, error: error.message };

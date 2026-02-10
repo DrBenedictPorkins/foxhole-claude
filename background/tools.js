@@ -931,27 +931,25 @@ Returns the result of the last expression.`,
   // ============================================================================
   {
     name: 'save_site_spec',
-    description: `Save a Site Spec for the current domain. Site Specs are persistent technical references that help with future tasks on this website.
+    description: `Save or update a Site Spec for the current domain. Specs persist across sessions and are injected into future conversations on this site.
 
-WHEN TO USE:
-- After discovering SPECIFIC, NON-OBVIOUS selectors (with classes, IDs, data-attributes, or unique attribute values)
-- After identifying API endpoints from network traffic
-- After finding localStorage/sessionStorage keys used by the site
-- After figuring out a multi-step interaction pattern that works
+If a spec with the same description already exists, it will be UPDATED with new content — so always reuse the same description to keep specs current.
 
-WHEN NOT TO USE:
-- For GENERIC selectors like "input", "button", "input[type=text]", "a" - these are useless
-- For obvious elements that take <5 seconds to find (main search box, nav links, etc.)
-- For one-time information (just tell the user directly)
-- If you haven't actually verified the selectors/patterns work
+SAVE AFTER:
+- Discovering stable selectors ([data-testid], [aria-label], [role], IDs, data-attributes)
+- Identifying API endpoints from network traffic
+- Finding localStorage/sessionStorage keys
+- Figuring out a multi-step workflow that works
 
-SELECTOR QUALITY CHECK - Before saving a DOM spec, ask:
-- Would this selector still work if the page layout changed slightly?
-- Is it specific enough to match ONLY the intended element(s)?
-- BAD: input[type="text"], button, .btn (too generic)
-- GOOD: input.cl-search-field, input[data-testid="search"], #product-grid .item-card
+DON'T SAVE:
+- Generic selectors (input, button, a, .btn)
+- Hashed class names (.css-1a2b3c, .sc-bdnxRM) — these break between deploys
+- One-time information — just tell the user
 
-The domain is auto-detected from the current tab.`,
+GOOD: [data-testid="search"], #product-grid [role="listitem"], [aria-label="Add to cart"]
+BAD: .css-k008qs, input[type="text"], button.btn-primary
+
+Domain is auto-detected from the current tab.`,
     input_schema: {
       type: 'object',
       properties: {

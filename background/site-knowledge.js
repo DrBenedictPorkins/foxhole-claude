@@ -610,8 +610,15 @@ function stripKnowledgeBlocks(response) {
 function formatForPrompt(items, domain) {
   if (!items || items.length === 0) return '';
 
-  // Sort by creation date, newest first (temporal precedence)
-  const sorted = [...items].sort((a, b) => b.created - a.created);
+  const MAX_SPECS_IN_PROMPT = 15;
+
+  // Sort by relevance: most recently used first, then by creation date
+  const sorted = [...items].sort((a, b) => {
+    // Prioritize frequently used specs
+    const aScore = (a.useCount || 0) + ((a.lastUsed || a.created) / 1e12);
+    const bScore = (b.useCount || 0) + ((b.lastUsed || b.created) / 1e12);
+    return bScore - aScore;
+  }).slice(0, MAX_SPECS_IN_PROMPT);
 
   let text = '\n\n';
   text += '======================================================================\n';
