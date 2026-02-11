@@ -2,7 +2,7 @@
 
 **Foxhole for Claude** - Firefox Browser Extension
 
-Last updated: January 27, 2026
+Last updated: February 10, 2026
 
 ---
 
@@ -47,6 +47,7 @@ The extension communicates exclusively with Anthropic's API (`api.anthropic.com`
 
 - Your conversation messages
 - Tool requests and responses (e.g., page content you ask Claude to analyze)
+- Screenshots and images when you use visual analysis tools (`take_screenshot`, `take_element_screenshot`, `read_image`) — sent as base64-encoded image blocks
 - Your API key for authentication
 
 Anthropic's data handling is governed by their [Privacy Policy](https://www.anthropic.com/privacy) and [Terms of Service](https://www.anthropic.com/terms).
