@@ -7,12 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-02-11
+
 ### Added
 - `read_image` tool — fetch page images by CSS selector or URL for Claude vision analysis (canvas approach with CORS fetch fallback)
 - Multi-image queue — screenshots and pasted images accumulate instead of overwriting; grid preview with per-image remove buttons
 - `take_element_screenshot` and `read_image` summarizers for conversation history
+- "View full payload" link in confirmation modal — opens formatted read-only popup window for large payloads
+- README screenshots documenting welcome screen, permission model, and security audit workflow
 
 ### Changed
+- Confirmation modal renders tool params as labeled blocks instead of raw JSON dump; multi-line values (code) display with real line breaks
 - Generalized image pipeline — any tool returning `result.screenshot` is converted to a vision block (fixes `take_element_screenshot` which previously fell through to text serialization)
 
 ## [1.3.0] - 2026-02-10
@@ -65,7 +70,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Token usage tracking with cache efficiency display
 - User-driven selection mode for marking page elements
 
-[Unreleased]: https://github.com/DrBenedictPorkins/foxhole-claude/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/DrBenedictPorkins/foxhole-claude/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/DrBenedictPorkins/foxhole-claude/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/DrBenedictPorkins/foxhole-claude/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/DrBenedictPorkins/foxhole-claude/compare/v1.0.0...v1.2.0
 [1.0.0]: https://github.com/DrBenedictPorkins/foxhole-claude/releases/tag/v1.0.0
