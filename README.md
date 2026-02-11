@@ -6,6 +6,8 @@ A Firefox sidebar extension that gives Claude direct control over your browser t
 
 You chat with Claude in a sidebar. Claude can see, navigate, click, type, extract, and manipulate any page you're on. It decides which tools to call, executes them, reads the results, and iterates autonomously until the task is done.
 
+![Welcome screen](docs/screenshots/01-welcome.jpg)
+
 ## Core Capabilities
 
 **Browser Automation** — Claude navigates pages, clicks elements, fills forms, types text, presses keys, scrolls, hovers, selects options, and checks boxes. All via CSS selectors.
@@ -53,7 +55,21 @@ Two autonomy modes, toggled in the toolbar:
 - **Confirm risky actions** (default) — High-risk tools (click, type, navigate, execute_script, fill_form, press_key) show a confirmation dialog. Configurable in settings.
 - **Skip all confirmations** — Everything auto-executes.
 
+![Confirmation modal](docs/screenshots/02-confirm-action.jpg)
+
+![Skip all confirmations](docs/screenshots/03-skip-confirmations.jpg)
+
 Tool iteration limits are configurable with an interactive prompt when the limit is reached (continue, add more, unlimited, or stop with summary).
+
+## Example: Security Audit
+
+Claude autonomously inspects scripts, trackers, consent mechanisms, and storage — then generates a downloadable HTML report.
+
+![Audit results](docs/screenshots/04-audit-results.jpg)
+
+![Report download](docs/screenshots/05-report-download.png)
+
+![Generated HTML report](docs/screenshots/06-audit-report.jpg)
 
 ## Installation
 

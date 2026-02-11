@@ -122,6 +122,88 @@ function handleClearChatConfirmed() {
 // ============================================================================
 
 /**
+ * Renders tool input parameters into the confirmation modal container.
+ * Multi-line string values (e.g. code) get their own code block with real line breaks.
+ * Short values render inline as label: value pairs.
+ */
+function renderConfirmParams(container, toolInput) {
+  container.innerHTML = '';
+  const entries = Object.entries(toolInput);
+
+  for (const [key, value] of entries) {
+    const str = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+    const isMultiLine = str.includes('\n');
+
+    const block = document.createElement('div');
+    block.className = 'confirm-param-block';
+
+    const label = document.createElement('span');
+    label.className = 'confirm-param-label';
+    label.textContent = key;
+    block.appendChild(label);
+
+    if (isMultiLine) {
+      const pre = document.createElement('pre');
+      pre.className = 'confirm-param-code';
+      pre.textContent = str;
+      block.appendChild(pre);
+    } else {
+      const val = document.createElement('span');
+      val.className = 'confirm-param-value';
+      val.textContent = str;
+      block.appendChild(val);
+    }
+
+    container.appendChild(block);
+  }
+}
+
+/**
+ * Adds a "View full" link to the params container that opens a formatted
+ * read-only page in a new tab. Only shown when payload exceeds a threshold.
+ */
+function renderViewFullLink(container, toolName, toolInput) {
+  const json = JSON.stringify(toolInput, null, 2);
+  if (json.length < 200) return;
+
+  const link = document.createElement('button');
+  link.className = 'confirm-view-full';
+  link.textContent = 'View full payload';
+  link.addEventListener('click', () => openPayloadTab(toolName, toolInput));
+  container.appendChild(link);
+}
+
+/**
+ * Opens a new tab with the full tool payload rendered as a formatted read-only page.
+ */
+function openPayloadTab(toolName, toolInput) {
+  const entries = Object.entries(toolInput);
+  const paramsHtml = entries.map(([key, value]) => {
+    const str = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+    const escaped = str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return `<div class="param"><span class="label">${key}</span><pre>${escaped}</pre></div>`;
+  }).join('\n');
+
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>${toolName} — Foxhole Payload</title>
+<style>
+  body { background: #1a1a1a; color: #d4d4d4; font-family: -apple-system, sans-serif; margin: 0; padding: 32px; }
+  h1 { font-size: 18px; color: #fff; margin: 0 0 24px; }
+  h1 span { color: #c9a227; }
+  .param { margin-bottom: 16px; }
+  .label { display: block; font-size: 11px; font-weight: 600; color: #c9a227; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  pre { margin: 0; padding: 12px; background: rgba(0,0,0,0.4); border-radius: 6px; font-family: 'SF Mono', Monaco, 'Courier New', monospace; font-size: 13px; white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
+</style></head><body>
+<h1><span>${toolName}</span> payload</h1>
+${paramsHtml}
+</body></html>`;
+
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  browser.windows.create({ url, type: 'popup', width: 720, height: 600 });
+}
+
+/**
  * Shows the tool confirmation modal for high-risk tool execution.
  *
  * @param {string} toolName - Name of the tool to execute
@@ -134,7 +216,8 @@ function showConfirmationModal(toolName, toolInput, toolId) {
   resetSwitchModeUI();
 
   config.elements.confirmAction.textContent = `Claude wants to execute: ${toolName}`;
-  config.elements.confirmParams.textContent = JSON.stringify(toolInput, null, 2);
+  renderConfirmParams(config.elements.confirmParams, toolInput);
+  renderViewFullLink(config.elements.confirmParams, toolName, toolInput);
   config.elements.confirmModal.classList.remove('hidden');
 }
 
