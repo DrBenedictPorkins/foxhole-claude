@@ -446,6 +446,10 @@ async function executeTool(toolName, toolInput) {
       case 'take_element_screenshot':
         return await handleTakeElementScreenshot(tabId, toolInput);
 
+      // Read image for visual analysis
+      case 'read_image':
+        return await handleReadImage(tabId, toolInput);
+
       // Simple wait/delay
       case 'wait':
         return await handleWait(toolInput);
@@ -1069,6 +1073,117 @@ async function handleTakeElementScreenshot(tabId, params) {
     selector,
     note: 'Full viewport captured. Use bounds to crop to element.'
   };
+}
+
+// ==========================================================================
+// Read Image Handler
+// ==========================================================================
+
+async function handleReadImage(tabId, params) {
+  const { selector, url } = params;
+
+  if (!selector && !url) {
+    throw new Error('Either selector or url is required');
+  }
+
+  // Build script to run in page context
+  // Strategy: draw image onto canvas, export as dataURL
+  // Fallback: if tainted canvas (CORS), fetch the URL as blob and convert to base64
+  const script = `
+    (async () => {
+      try {
+        let imgSrc;
+        let imgEl;
+
+        ${selector ? `
+        // Selector mode: find the <img> element
+        imgEl = document.querySelector(${JSON.stringify(selector)});
+        if (!imgEl) {
+          return { error: 'Element not found: ${selector.replace(/'/g, "\\'")}' };
+        }
+        if (imgEl.tagName !== 'IMG') {
+          // Try to find an img inside the element
+          const innerImg = imgEl.querySelector('img');
+          if (innerImg) {
+            imgEl = innerImg;
+          } else {
+            return { error: 'Element is not an <img> and contains no <img>: ' + imgEl.tagName };
+          }
+        }
+        imgSrc = imgEl.src || imgEl.currentSrc;
+        if (!imgSrc) {
+          return { error: 'Image element has no src' };
+        }
+        ` : `
+        // URL mode: use provided URL directly
+        imgSrc = ${JSON.stringify(url)};
+        `}
+
+        // Helper: fetch image as base64 via blob (CORS fallback)
+        async function fetchAsBase64(imageUrl) {
+          const resp = await fetch(imageUrl);
+          if (!resp.ok) throw new Error('Fetch failed: ' + resp.status);
+          const blob = await resp.blob();
+          return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        }
+
+        // Try canvas approach first (works for same-origin and CORS-enabled images)
+        try {
+          // If we have the element and it's already loaded, use it directly
+          if (imgEl && imgEl.complete && imgEl.naturalWidth > 0) {
+            const canvas = document.createElement('canvas');
+            canvas.width = imgEl.naturalWidth;
+            canvas.height = imgEl.naturalHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(imgEl, 0, 0);
+            const dataUrl = canvas.toDataURL('image/png');
+            return { screenshot: dataUrl };
+          }
+
+          // Load image fresh (handles URL mode and not-yet-loaded images)
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          const loaded = await new Promise((resolve, reject) => {
+            img.onload = () => resolve(true);
+            img.onerror = () => reject(new Error('Image load failed'));
+            img.src = imgSrc;
+          });
+
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          const dataUrl = canvas.toDataURL('image/png');
+          return { screenshot: dataUrl };
+        } catch (canvasErr) {
+          // Canvas tainted by CORS or load failed — try fetch fallback
+          console.warn('[read_image] Canvas approach failed, trying fetch fallback:', canvasErr.message);
+          try {
+            const dataUrl = await fetchAsBase64(imgSrc);
+            return { screenshot: dataUrl };
+          } catch (fetchErr) {
+            return { error: 'Could not read image. Canvas: ' + canvasErr.message + '. Fetch: ' + fetchErr.message };
+          }
+        }
+      } catch (e) {
+        return { error: e.message };
+      }
+    })()
+  `;
+
+  const result = await sendToContentScript(tabId, 'execute_script', { code: script });
+
+  // execute_script wraps in { result: ... }
+  if (result && result.result) {
+    return result.result;
+  }
+  return result;
 }
 
 // ==========================================================================

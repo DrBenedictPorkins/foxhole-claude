@@ -35,8 +35,8 @@ function createMessageSender(deps) {
    */
   function handleInputChange() {
     const hasText = elements.userInput.value.trim().length > 0;
-    const hasImage = state.pendingImage !== null;
-    elements.sendBtn.disabled = (!hasText && !hasImage) || state.isStreaming;
+    const hasImages = (state.pendingImages || []).length > 0;
+    elements.sendBtn.disabled = (!hasText && !hasImages) || state.isStreaming;
   }
 
   /**
@@ -45,10 +45,10 @@ function createMessageSender(deps) {
    */
   async function handleSendMessage() {
     const text = elements.userInput.value.trim();
-    const hasImage = state.pendingImage !== null;
+    const hasImages = (state.pendingImages || []).length > 0;
 
     // Need either text or image to send
-    if ((!text && !hasImage) || state.isStreaming) return;
+    if ((!text && !hasImages) || state.isStreaming) return;
 
     if (!state.apiKeyConfigured) {
       callbacks.showApiKeyModal();
@@ -60,9 +60,9 @@ function createMessageSender(deps) {
     elements.userInput.style.height = 'auto';
     elements.sendBtn.disabled = true;
 
-    // Capture and clear pending image before async operations
-    const imageToSend = state.pendingImage;
-    if (hasImage) {
+    // Capture and clear pending images before async operations
+    const imagesToSend = hasImages ? [...state.pendingImages] : null;
+    if (hasImages) {
       callbacks.clearPendingImage();
     }
 
@@ -76,28 +76,25 @@ function createMessageSender(deps) {
     let messageContent;
     let displayText = text;
 
-    if (imageToSend) {
-      // Build content array with image and optional text
-      messageContent = [
-        {
-          type: 'image',
-          source: {
-            type: 'base64',
-            media_type: imageToSend.mediaType,
-            data: imageToSend.base64
-          }
+    if (imagesToSend) {
+      messageContent = imagesToSend.map(img => ({
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: img.mediaType,
+          data: img.base64
         }
-      ];
+      }));
       if (text) {
         messageContent.push({ type: 'text', text: text });
       }
-      displayText = text || '[Image]';
+      displayText = text || `[${imagesToSend.length} image${imagesToSend.length > 1 ? 's' : ''}]`;
     } else {
       messageContent = text;
     }
 
-    // Add user message to UI (show image if present)
-    callbacks.addMessageToUI('user', displayText, imageToSend);
+    // Add user message to UI (show images if present)
+    callbacks.addMessageToUI('user', displayText, imagesToSend);
 
     // Add to conversation
     state.conversation.push({ role: 'user', content: messageContent });

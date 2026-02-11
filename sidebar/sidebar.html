@@ -115,17 +115,9 @@
 
     <!-- Input Area -->
     <div class="input-area">
-      <!-- Image Preview (for pasted/attached images) -->
+      <!-- Image Preview (for pasted/attached/screenshot images - supports multiple) -->
       <div id="image-preview-container" class="image-preview-container hidden">
-        <div class="image-preview-wrapper">
-          <img id="image-preview" class="image-preview" alt="Pasted image">
-          <button id="remove-image-btn" class="remove-image-btn" title="Remove image">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
-        </div>
+        <div class="image-preview-grid"></div>
       </div>
       <div class="input-wrapper">
         <textarea

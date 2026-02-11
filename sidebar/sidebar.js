@@ -41,8 +41,8 @@
   /** @type {string[]} Tools that require confirmation in 'ask' mode */
   let configuredHighRiskTools = ['click_element', 'type_text', 'navigate', 'execute_script', 'fill_form', 'press_key'];
 
-  /** @type {Object|null} Pending image to send with next message */
-  let pendingImage = null;
+  /** @type {Array} Pending images to send with next message */
+  let pendingImages = [];
 
   /** @type {Array} Tool names used during current streaming response (for conversation history) */
   let currentStreamingTools = [];
@@ -74,8 +74,7 @@
   const autonomyOptions = document.querySelectorAll('.autonomy-option');
   const screenshotBtn = document.getElementById('screenshot-btn');
   const imagePreviewContainer = document.getElementById('image-preview-container');
-  const imagePreview = document.getElementById('image-preview');
-  const removeImageBtn = document.getElementById('remove-image-btn');
+  // imagePreview and removeImageBtn are now created dynamically per-image in renderImagePreviews()
   const settingsMenuBtn = document.getElementById('settings-menu-btn');
   const exportContextBtn = document.getElementById('export-context-btn');
 
@@ -132,7 +131,7 @@
       tokenUsage,
       lastTurnTokens,
       configuredHighRiskTools,
-      pendingImage,
+      pendingImages,
       currentTabId,
       currentWindowId,
       tabConversations
@@ -149,7 +148,7 @@
     if ('apiKeyConfigured' in updates) apiKeyConfigured = updates.apiKeyConfigured;
     if ('tokenUsage' in updates) tokenUsage = updates.tokenUsage;
     if ('lastTurnTokens' in updates) lastTurnTokens = updates.lastTurnTokens;
-    if ('pendingImage' in updates) pendingImage = updates.pendingImage;
+    if ('pendingImages' in updates) pendingImages = updates.pendingImages;
     if ('currentTabId' in updates) currentTabId = updates.currentTabId;
     if ('currentWindowId' in updates) currentWindowId = updates.currentWindowId;
   }
@@ -198,7 +197,6 @@
         autonomyOptions,
         chatContainer,
         userInput,
-        imagePreview,
         imagePreviewContainer,
         attachMenu
       },
@@ -209,6 +207,7 @@
         getWelcomeMessageHtml: window.TabManager.getWelcomeMessageHtml,
         attachPromptButtonListeners: () => window.TabManager.attachPromptButtonListeners(userInput),
         clearPendingImage,
+        renderImagePreviews,
         updateTokenUsage,
         refreshTokenDisplay,
         handleInputChange,
@@ -306,8 +305,8 @@
       resetStreamingState();
     }
 
-    if (pendingImage) {
-      clearPendingImage();
+    if (pendingImages.length > 0) {
+      clearPendingImages();
     }
 
     if (savedState) {
@@ -432,7 +431,7 @@
       option.addEventListener('click', window.ModalManager.autonomy.handleChange);
     });
 
-    // Screenshot button - takes screenshot and attaches to message
+    // Screenshot button - takes screenshot and adds to image queue
     screenshotBtn.addEventListener('click', async () => {
       try {
         screenshotBtn.disabled = true;
@@ -441,9 +440,8 @@
           // Extract media type and base64 from data URL
           const match = result.screenshot.match(/^data:(image\/\w+);base64,(.+)$/);
           if (match) {
-            pendingImage = { mediaType: match[1], base64: match[2] };
-            imagePreview.src = result.screenshot;
-            imagePreviewContainer.classList.remove('hidden');
+            pendingImages.push({ mediaType: match[1], base64: match[2] });
+            renderImagePreviews();
             handleInputChange();
             userInput.focus();
           }
@@ -454,7 +452,7 @@
         screenshotBtn.disabled = false;
       }
     });
-    removeImageBtn.addEventListener('click', window.ModalManager.attach.remove);
+    // Remove buttons are now per-image, created dynamically in renderImagePreviews()
     userInput.addEventListener('paste', window.ModalManager.attach.handlePaste);
 
     // Settings
@@ -571,15 +569,15 @@
 
   function handleInputChange() {
     const hasText = userInput.value.trim().length > 0;
-    const hasImage = pendingImage !== null;
-    sendBtn.disabled = (!hasText && !hasImage) || isStreaming;
+    const hasImages = pendingImages.length > 0;
+    sendBtn.disabled = (!hasText && !hasImages) || isStreaming;
   }
 
   async function handleSendMessage() {
     const text = userInput.value.trim();
-    const hasImage = pendingImage !== null;
+    const hasImages = pendingImages.length > 0;
 
-    if ((!text && !hasImage) || isStreaming) return;
+    if ((!text && !hasImages) || isStreaming) return;
 
     if (!apiKeyConfigured) {
       window.ModalManager.apiKey.show();
@@ -590,9 +588,9 @@
     userInput.style.height = 'auto';
     sendBtn.disabled = true;
 
-    const imageToSend = pendingImage;
-    if (hasImage) {
-      clearPendingImage();
+    const imagesToSend = hasImages ? [...pendingImages] : null;
+    if (hasImages) {
+      clearPendingImages();
     }
 
     const welcomeMsg = chatContainer.querySelector('.welcome-message');
@@ -603,26 +601,24 @@
     let messageContent;
     let displayText = text;
 
-    if (imageToSend) {
-      messageContent = [
-        {
-          type: 'image',
-          source: {
-            type: 'base64',
-            media_type: imageToSend.mediaType,
-            data: imageToSend.base64
-          }
+    if (imagesToSend) {
+      messageContent = imagesToSend.map(img => ({
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: img.mediaType,
+          data: img.base64
         }
-      ];
+      }));
       if (text) {
         messageContent.push({ type: 'text', text: text });
       }
-      displayText = text || '[Image]';
+      displayText = text || `[${imagesToSend.length} image${imagesToSend.length > 1 ? 's' : ''}]`;
     } else {
       messageContent = text;
     }
 
-    addMessageToUI('user', displayText, imageToSend);
+    addMessageToUI('user', displayText, imagesToSend);
     conversation.push({ role: 'user', content: messageContent });
     await sendToBackground();
   }
@@ -1414,11 +1410,57 @@
     selectedModel = modelSelect.value;
   }
 
-  function clearPendingImage() {
-    pendingImage = null;
-    imagePreview.src = '';
-    imagePreviewContainer.classList.add('hidden');
+  function clearPendingImages() {
+    pendingImages = [];
+    renderImagePreviews();
     handleInputChange();
+  }
+
+  // Legacy alias for modal-manager compatibility
+  function clearPendingImage() {
+    clearPendingImages();
+  }
+
+  function renderImagePreviews() {
+    let previewGrid = imagePreviewContainer.querySelector('.image-preview-grid');
+    if (!previewGrid) {
+      previewGrid = document.createElement('div');
+      previewGrid.className = 'image-preview-grid';
+      imagePreviewContainer.innerHTML = '';
+      imagePreviewContainer.appendChild(previewGrid);
+    }
+    previewGrid.innerHTML = '';
+
+    if (pendingImages.length === 0) {
+      imagePreviewContainer.classList.add('hidden');
+      return;
+    }
+
+    pendingImages.forEach((img, idx) => {
+      const thumb = document.createElement('div');
+      thumb.className = 'image-preview-thumb';
+
+      const imgEl = document.createElement('img');
+      imgEl.className = 'image-preview';
+      imgEl.src = `data:${img.mediaType};base64,${img.base64}`;
+      imgEl.alt = `Image ${idx + 1}`;
+
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'remove-image-btn';
+      removeBtn.title = 'Remove image';
+      removeBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+      removeBtn.addEventListener('click', () => {
+        pendingImages.splice(idx, 1);
+        renderImagePreviews();
+        handleInputChange();
+      });
+
+      thumb.appendChild(imgEl);
+      thumb.appendChild(removeBtn);
+      previewGrid.appendChild(thumb);
+    });
+
+    imagePreviewContainer.classList.remove('hidden');
   }
 
   // ============================================================================

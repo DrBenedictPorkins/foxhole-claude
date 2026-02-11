@@ -725,19 +725,25 @@ function createMessageElement(role, content, image = null, callbacks = {}) {
   const contentElement = document.createElement('div');
   contentElement.className = 'message-content';
 
-  // For user messages with images, show the image
+  // For user messages with images, show image(s)
+  // image param can be a single object or an array of objects
   if (role === 'user' && image) {
+    const images = Array.isArray(image) ? image : [image];
     const imgContainer = document.createElement('div');
     imgContainer.className = 'message-image-container';
-    const img = document.createElement('img');
-    img.className = 'message-image';
-    img.src = `data:${image.mediaType};base64,${image.base64}`;
-    img.alt = 'Attached image';
-    imgContainer.appendChild(img);
+
+    for (const img of images) {
+      const imgEl = document.createElement('img');
+      imgEl.className = 'message-image';
+      imgEl.src = `data:${img.mediaType};base64,${img.base64}`;
+      imgEl.alt = 'Attached image';
+      imgContainer.appendChild(imgEl);
+    }
+
     contentElement.appendChild(imgContainer);
 
-    // Add text below image if present
-    if (content && content !== '[Image]') {
+    // Add text below images if present
+    if (content && content !== '[Image]' && !content.match(/^\[\d+ images?\]$/)) {
       const textDiv = document.createElement('div');
       textDiv.className = 'message-text';
       textDiv.innerHTML = RenderUtils.escapeHtml(content);

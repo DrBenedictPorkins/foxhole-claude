@@ -36,7 +36,7 @@
  * @property {number|null} streamingTabId - Tab ID associated with current stream
  * @property {number|null} pendingTabSwitch - Tab to switch to after streaming completes
  * @property {string} autonomyMode - Current autonomy mode ('ask' or 'auto')
- * @property {Object|null} pendingImage - Pending image to send with next message
+ * @property {Array} pendingImages - Pending images to send with next message
  */
 
 /**
@@ -206,7 +206,7 @@ function loadTabState(tabId, state, callbacks, elements) {
     callbacks.resetStreamingState();
   }
 
-  if (state.pendingImage) {
+  if (state.pendingImages && state.pendingImages.length > 0) {
     callbacks.clearPendingImage();
   }
 

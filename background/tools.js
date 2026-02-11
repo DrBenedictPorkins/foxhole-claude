@@ -512,6 +512,23 @@ const BROWSER_TOOLS = [
       required: ['selector'],
     },
   },
+  {
+    name: 'read_image',
+    description: 'Fetch an image from the page and return it for visual analysis. Use this to read text in images, analyze charts, or examine visual content. Accepts a CSS selector for an <img> element OR a direct image URL.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        selector: {
+          type: 'string',
+          description: 'CSS selector for an <img> element on the page',
+        },
+        url: {
+          type: 'string',
+          description: 'Direct image URL. Use when you have the src but no reliable selector.',
+        },
+      },
+    },
+  },
 
   // ============================================================================
   // FILE OUTPUT - ONLY when user explicitly requests

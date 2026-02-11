@@ -45,7 +45,6 @@ let config = null;
  * @param {NodeList} cfg.elements.autonomyOptions - Autonomy option buttons
  * @param {HTMLElement} cfg.elements.chatContainer - Chat messages container
  * @param {HTMLElement} cfg.elements.userInput - User input textarea
- * @param {HTMLElement} cfg.elements.imagePreview - Image preview element
  * @param {HTMLElement} cfg.elements.imagePreviewContainer - Image preview container
  * @param {HTMLElement} [cfg.elements.attachMenu] - Attachment menu (optional)
  * @param {Object} cfg.callbacks - Callback functions
@@ -543,19 +542,16 @@ async function processImageFile(file) {
         const mediaType = base64Match[1];
         const base64Data = base64Match[2];
 
-        // Store pending image
-        config.callbacks.setState({
-          pendingImage: {
-            mediaType: mediaType,
-            base64: base64Data
-          }
-        });
+        // Add to pending images array
+        const state = config.callbacks.getState();
+        const images = [...(state.pendingImages || [])];
+        images.push({ mediaType, base64: base64Data });
+        config.callbacks.setState({ pendingImages: images });
 
-        // Show preview
-        config.elements.imagePreview.src = dataUrl;
-        config.elements.imagePreviewContainer.classList.remove('hidden');
-
-        // Enable send button
+        // Re-render previews and update send button
+        if (config.callbacks.renderImagePreviews) {
+          config.callbacks.renderImagePreviews();
+        }
         config.callbacks.handleInputChange();
 
         // Focus input for user to add optional text
@@ -579,9 +575,10 @@ function handleRemoveImage() {
  * Clears pending image and hides preview.
  */
 function clearPendingImage() {
-  config.callbacks.setState({ pendingImage: null });
-  config.elements.imagePreview.src = '';
-  config.elements.imagePreviewContainer.classList.add('hidden');
+  config.callbacks.setState({ pendingImages: [] });
+  if (config.callbacks.renderImagePreviews) {
+    config.callbacks.renderImagePreviews();
+  }
   config.callbacks.handleInputChange();
 }
 

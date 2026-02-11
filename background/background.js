@@ -919,6 +919,15 @@
         }
         return `[take_screenshot] Captured screenshot`;
 
+      case 'take_element_screenshot':
+        return `[take_element_screenshot] Captured element: ${input.selector}`;
+
+      case 'read_image':
+        if (result.screenshot) {
+          return `[read_image] Read image${input.selector ? ` from ${input.selector}` : ''}${input.url ? ` from URL` : ''}`;
+        }
+        return `[read_image] Failed: ${result.error || 'unknown error'}`;
+
       case 'create_markdown':
         return `[create_markdown] Saved: ${result.filename || 'output.md'}`;
 
@@ -1268,8 +1277,8 @@
         const summary = summarizeToolResult(name, input, result);
         toolSummaries.push({ id, name, input, summary });
 
-        // Handle screenshots specially - use image content block for Claude
-        if (name === 'take_screenshot' && result.screenshot) {
+        // Handle image results specially - use image content block for Claude vision
+        if (result.screenshot) {
           try {
             // Extract media type and base64 data from data URL
             const dataUrlMatch = result.screenshot.match(/^data:(image\/\w+);base64,(.+)$/);
