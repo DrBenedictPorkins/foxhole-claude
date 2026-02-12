@@ -273,13 +273,16 @@ function getWelcomeMessageHtml() {
       <p class="welcome-tip">Try these to get started:</p>
       <div class="welcome-prompts">
         <button class="prompt-btn" data-prompt="Monitor network traffic as I browse this site. Summarize API endpoints, methods, and request patterns. For large payloads, just note the structure - don't dump raw data. I want to understand how to replicate this site's functionality programmatically.">
-          Find API Traffic
+          🔍 Record API Traffic
         </button>
         <button class="prompt-btn" data-prompt="Analyze the network calls captured so far. Document the internal APIs: list endpoints, auth headers, request formats, and response structures. Create a quick reference I can use to call these APIs directly.">
-          Document APIs
+          📋 Document APIs
         </button>
         <button class="prompt-btn" data-prompt="Analyze this page's DOM structure and document the key selectors for: navigation, search, product/item listings, forms, and interactive elements. Save as site specs for future reference.">
-          Map DOM Structure
+          🗺️ Map DOM Structure
+        </button>
+        <button class="prompt-btn" data-prompt="Audit this page for privacy and security issues. Check for: third-party trackers and analytics scripts, dark patterns (hidden opt-ins, misleading buttons, forced consent), exposed data in the DOM or network requests, insecure form actions, and suspicious external resource loading. Summarize findings by severity.">
+          🛡️ Security Audit
         </button>
       </div>
     </div>
@@ -298,7 +301,7 @@ function attachPromptButtonListeners(userInput) {
   const input = userInput || document.getElementById('user-input');
   console.log('[PromptButtons] Found', buttons.length, 'buttons, userInput passed:', !!userInput, 'fallback:', !!input);
 
-  buttons.forEach((btn, idx) => {
+  buttons.forEach((btn) => {
     // Remove old listeners by cloning
     const newBtn = btn.cloneNode(true);
     btn.parentNode.replaceChild(newBtn, btn);

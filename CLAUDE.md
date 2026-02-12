@@ -34,10 +34,14 @@ Logic in `background.js`: `needsConfirmation = mode === 'ask' && isHighRisk`
 ## Conventions
 
 - No build step — raw JS/CSS/HTML loaded directly by Firefox
+- Manifest version must be pure numeric `major.minor.patch` — Firefox rejects suffixes like `-dev` or `-beta`
 - State stored in `browser.storage.local`
 - CSS uses custom properties defined in `:root` in `sidebar.css`
 - No generic `.hidden` utility class — use scoped `.modal.hidden` or `style.display`
 - Token display has visual tiers at 50k/100k/150k cumulative tokens
+- Welcome screen is defined in both `sidebar.html` (initial load) and `tab-manager.js:getWelcomeMessageHtml()` (tab switch) — keep them in sync
+- Any tool returning `result.screenshot` (a data URL) gets converted to a Claude vision image block in `background.js` — this is the universal image pipeline
+- Screenshots stored in `docs/screenshots/`, named with numeric prefix for sort order (e.g., `01-welcome.jpg`)
 
 ## Testing
 
