@@ -1,23 +1,18 @@
 # Foxhole for Claude
 
-Claude in your Firefox sidebar. 62 tools — DOM, network, storage, cookies, scripts, screenshots. You talk, it drives.
+Skip Puppeteer/Playwright. Claude sits in your Firefox sidebar with 62 tools.
 
-BYOK. Firefox 91+. No build step.
+Tell it what you want in English, it drives the browser.
+DOM, network, storage, cookies, scripts — your logged-in session, not a headless bot.
 
 ## Install
 
-1. `about:debugging#/runtime/this-firefox` → Load Temporary Add-on → select `manifest.json`
-2. Click sidebar icon → Settings → paste your Anthropic API key
+```
+git clone https://github.com/DrBenedictPorkins/foxhole-claude.git
+```
 
-## What Claude can do
-
-- **See** — screenshots, DOM inspection, element bounds, computed styles
-- **Act** — click, type, scroll, fill forms, press keys, navigate, manage tabs
-- **Extract** — run JS in page context, read cookies/storage/clipboard, capture network traffic
-- **Remember** — per-site knowledge base that persists across sessions
-- **Output** — generate markdown/HTML files, extract and replace page content
-
-62 tools total. Two autonomy modes: confirm risky actions (default) or full auto.
+1. Firefox → `about:debugging#/runtime/this-firefox` → Load Temporary Add-on → `manifest.json`
+2. Sidebar icon → Settings → Anthropic API key
 
 ## Tools
 
@@ -41,6 +36,8 @@ BYOK. Firefox 91+. No build step.
 | Marking | `mark_elements` `get_marked_elements` `clear_marked_elements` |
 | Selection | `toggle_selection_mode` `get_user_selections` `clear_user_selections` |
 
+Two autonomy modes: confirm risky actions (default) or full auto.
+
 ## Architecture
 
 Manifest V2 WebExtension. Raw JS/CSS/HTML — no bundler.
@@ -52,11 +49,9 @@ Manifest V2 WebExtension. Raw JS/CSS/HTML — no bundler.
 | Sidebar | `sidebar/` | Chat UI, modals, tab state |
 | Options | `options/` | Settings |
 
-Dev conventions in [CLAUDE.md](CLAUDE.md).
-
 ## Privacy
 
-All data stays local. Only external call is Anthropic's API with your key. See [PRIVACY.md](PRIVACY.md).
+All data stays local. Only external call is Anthropic's API with your key.
 
 ## License
 
