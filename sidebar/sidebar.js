@@ -246,6 +246,7 @@
         });
         console.log(`[Sidebar] Initialized for window ${currentWindowId}, tab ${currentTabId}`);
         updateTabInfo();
+        updateApiIndicator();
       }
 
       browser.tabs.onActivated.addListener(handleTabActivated);
@@ -259,6 +260,7 @@
   function handleTabUpdated(tabId, changeInfo, _tab) {
     if (tabId === currentTabId && (changeInfo.url || changeInfo.title)) {
       updateTabInfo();
+      updateApiIndicator();
     }
   }
 
@@ -281,6 +283,7 @@
     loadTabState(newTabId);
     specsManager?.updateBadge();
     updateTabInfo();
+    updateApiIndicator();
   }
 
   function handleTabRemoved(tabId, _removeInfo) {
@@ -776,6 +779,7 @@
         loadTabState(message.tabId);
         specsManager?.updateBadge();
         updateTabInfo();
+        updateApiIndicator();
       }
     }
   }
@@ -997,6 +1001,7 @@
       loadTabState(tabToSwitchTo);
       specsManager?.updateBadge();
       updateTabInfo();
+      updateApiIndicator();
     }
 
     // Check if context compression is needed
@@ -1318,6 +1323,69 @@
   }
 
   // ============================================================================
+  // API OBSERVER INDICATOR
+  // ============================================================================
+
+  async function updateApiIndicator() {
+    const indicator = document.getElementById('api-indicator');
+    const countEl = document.getElementById('api-indicator-count');
+    if (!indicator || !countEl) return;
+
+    try {
+      const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.url) {
+        indicator.classList.add('hidden');
+        return;
+      }
+
+      let domain;
+      try {
+        domain = new URL(tab.url).hostname.replace(/^www\./, '');
+      } catch {
+        indicator.classList.add('hidden');
+        return;
+      }
+
+      const counts = await browser.runtime.sendMessage({ type: 'GET_OBSERVER_COUNTS', domain });
+      const apiCount = counts?.api || 0;
+      const domCount = counts?.dom || 0;
+      const totalCount = apiCount + domCount;
+
+      if (totalCount > 0) {
+        countEl.textContent = totalCount;
+        const parts = [];
+        if (apiCount > 0) parts.push(`${apiCount} API endpoint${apiCount !== 1 ? 's' : ''}`);
+        if (domCount > 0) parts.push(`${domCount} DOM pattern${domCount !== 1 ? 's' : ''}`);
+        indicator.title = `${parts.join(', ')} observed on ${domain}`;
+        indicator.classList.remove('hidden');
+        indicator.classList.add('has-patterns');
+      } else {
+        indicator.classList.add('hidden');
+        indicator.classList.remove('has-patterns');
+      }
+    } catch (e) {
+      indicator.classList.add('hidden');
+    }
+  }
+
+  // Refresh indicator periodically so count updates while browsing
+  setInterval(updateApiIndicator, 10000);
+
+  // Click indicator to paste a prompt querying captured data
+  const apiIndicator = document.getElementById('api-indicator');
+  if (apiIndicator) {
+    apiIndicator.style.cursor = 'pointer';
+    apiIndicator.addEventListener('click', () => {
+      const prompt = 'List all observed API endpoints and DOM patterns for this site with full paths and hit counts.';
+      userInput.value = prompt;
+      userInput.style.height = 'auto';
+      userInput.style.height = Math.min(userInput.scrollHeight, 120) + 'px';
+      userInput.focus();
+      handleInputChange();
+    });
+  }
+
+  // ============================================================================
   // LEARNING SYSTEM
   // ============================================================================
 
@@ -1410,16 +1478,7 @@
   }
 
   function addComplexityFooter(msgElement, score) {
-    window.StreamRenderer.addComplexityFooter(msgElement, score, {
-      onExtractSpecs: (el) => handleManualSpecExtraction(el)
-    });
-  }
-
-  async function handleManualSpecExtraction(msgElement) {
-    await window.StreamRenderer.handleManualSpecExtraction(msgElement, chatContainer, {
-      getCurrentDomain,
-      updateNotesBadge: () => specsManager?.updateBadge()
-    });
+    window.StreamRenderer.addComplexityFooter(msgElement, score);
   }
 
   // ============================================================================

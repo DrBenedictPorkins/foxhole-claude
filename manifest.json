@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Foxhole for Claude",
-  "version": "1.5.1",
+  "version": "1.6.0",
   "description": "Chat with Claude to control your Firefox browser",
 
   "browser_specific_settings": {
@@ -55,6 +55,8 @@
       "background/claude-api.js",
       "background/tool-router.js",
       "background/site-knowledge.js",
+      "background/api-observer.js",
+      "background/interaction-observer.js",
       "background/background.js"
     ],
     "persistent": true

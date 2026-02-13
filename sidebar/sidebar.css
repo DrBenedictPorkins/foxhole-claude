@@ -190,6 +190,27 @@ body {
   background: rgba(239, 68, 68, 0.12);
 }
 
+.api-indicator {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--input-bg);
+  padding: 3px 6px;
+  border-radius: 4px;
+  cursor: help;
+  transition: color 0.3s ease;
+}
+
+.api-indicator.has-patterns {
+  color: var(--accent-color, #818cf8);
+}
+
+.api-indicator.hidden {
+  display: none;
+}
+
 .toolbar-separator {
   color: var(--border-color);
   font-size: 12px;
@@ -1783,46 +1804,6 @@ input:checked + .toggle-slider:before {
   flex-shrink: 0;
   min-width: 28px;
   text-align: right;
-}
-
-/* Analyze button in complexity footer */
-.analyze-specs-btn {
-  background: transparent;
-  border: 1px solid var(--text-secondary);
-  color: var(--text-secondary);
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.analyze-specs-btn:hover {
-  background: var(--input-bg);
-  border-color: var(--text-primary);
-  color: var(--text-primary);
-}
-
-.analyze-specs-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.complexity-status {
-  margin-left: 4px;
-  font-style: italic;
-}
-
-.complexity-status.success {
-  color: var(--success-color);
-}
-
-.complexity-status.error {
-  color: var(--error-color);
-}
-
-.complexity-status.info {
-  color: var(--text-muted);
 }
 
 /* Working Notes and Final Answer Structure */

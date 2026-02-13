@@ -401,14 +401,34 @@
       case 'SET_NOTES_REVIEWED':
         return handleSetKnowledgeReviewed(payload);
 
-      case 'EXTRACT_NOTE':
-        return handleExtractNote(payload);
-
       case 'EXPORT_CONTEXT':
         return handleExportContext(payload);
 
       case 'SUMMARIZE_CONTEXT':
         return handleSummarizeContext(payload);
+
+      case 'GET_API_PATTERN_COUNT': {
+        if (!window.ApiObserver) return { count: 0 };
+        const domain = payload.domain;
+        if (!domain) return { count: 0 };
+        const patterns = window.ApiObserver.getPatterns(domain);
+        return { count: Object.keys(patterns).length };
+      }
+
+      case 'GET_INTERACTION_PATTERN_COUNT': {
+        if (!window.InteractionObserver) return { count: 0 };
+        const domain = payload.domain;
+        if (!domain) return { count: 0 };
+        return { count: window.InteractionObserver.getPatternCount(domain) };
+      }
+
+      case 'GET_OBSERVER_COUNTS': {
+        const domain = payload.domain;
+        if (!domain) return { api: 0, dom: 0 };
+        const apiPatterns = window.ApiObserver ? window.ApiObserver.getPatterns(domain) : {};
+        const domCount = window.InteractionObserver ? window.InteractionObserver.getPatternCount(domain) : 0;
+        return { api: Object.keys(apiPatterns).length, dom: domCount };
+      }
 
       default:
         // Only warn for truly unknown messages
@@ -1275,6 +1295,16 @@
         const result = await window.executeTool(name, input);
         console.log(`Tool result (${name}):`, result);
 
+        // Feed to passive interaction observer
+        if (window.InteractionObserver && tabUrl) {
+          try {
+            const domain = new URL(tabUrl).hostname.replace(/^www\./, '');
+            window.InteractionObserver.processToolResult(name, input, result, domain);
+          } catch (e) {
+            // Silently ignore - observer is non-critical
+          }
+        }
+
         // Create summary for history storage
         const summary = summarizeToolResult(name, input, result);
         toolSummaries.push({ id, name, input, summary });
@@ -1584,6 +1614,34 @@ ${rawKnowledge}
       }
     }
 
+    // Add observed API patterns for current domain
+    if (tabUrl && window.ApiObserver) {
+      try {
+        const domain = new URL(tabUrl).hostname.replace(/^www\./, '');
+        const apiPatterns = window.ApiObserver.formatForPrompt(domain);
+        if (apiPatterns) {
+          dynamicContext += apiPatterns;
+          console.log(`[ApiObserver] Injected patterns for ${domain}`);
+        }
+      } catch (e) {
+        console.warn('[ApiObserver] Format error:', e);
+      }
+    }
+
+    // Add observed DOM interaction patterns for current domain
+    if (tabUrl && window.InteractionObserver) {
+      try {
+        const domain = new URL(tabUrl).hostname.replace(/^www\./, '');
+        const domPatterns = window.InteractionObserver.formatForPrompt(domain);
+        if (domPatterns) {
+          dynamicContext += domPatterns;
+          console.log(`[InteractionObserver] Injected patterns for ${domain}`);
+        }
+      } catch (e) {
+        console.warn('[InteractionObserver] Format error:', e);
+      }
+    }
+
     // Add current autonomy mode info (per-tab setting)
     if (getAutonomyMode(tabId) === 'auto') {
       dynamicContext += '\n\nMode: AUTO - Tools execute immediately.';
@@ -1833,135 +1891,6 @@ ${rawKnowledge}
       return { success: false, error: 'SiteKnowledge not available' };
     } catch (error) {
       console.error('[SiteKnowledge] Error setting knowledge reviewed:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  // Extract knowledge from interaction using Claude
-  async function handleExtractNote(payload) {
-    const { domain, userRequest, assistantResponse, toolCalls } = payload;
-
-    if (!domain || !userRequest) {
-      return { success: false, error: 'Missing required data' };
-    }
-
-    if (!claudeApi) {
-      return { success: false, error: 'API not configured' };
-    }
-
-    // Get existing knowledge to avoid duplicates
-    let existingKnowledge = '';
-    if (window.SiteKnowledge) {
-      try {
-        const knowledge = await window.SiteKnowledge.get(domain);
-        if (knowledge.length > 0) {
-          existingKnowledge = '\n**Existing Knowledge (DO NOT DUPLICATE):**\n';
-          knowledge.forEach(item => {
-            existingKnowledge += `- "${item.description || item.goal || item.issue}"\n`;
-          });
-        }
-      } catch (e) {
-        console.warn('[ExtractKnowledge] Could not get existing knowledge:', e);
-      }
-    }
-
-    const extractionPrompt = `Analyze the TOOL CALLS from this browser interaction. Extract a site spec ONLY if there are reusable patterns.
-
-**Domain:** ${domain}
-${existingKnowledge}
-**User Request:** ${userRequest}
-
-**Tool Calls (PRIMARY SOURCE - extract selectors and patterns from here):**
-${toolCalls || 'None'}
-
-**Assistant Summary:** ${assistantResponse.slice(0, 500)}
-
----
-
-RESPOND WITH EXACTLY ONE OF:
-
-1. **NO_USEFUL_PATTERNS** - if:
-   - No meaningful tool calls (just navigation or simple queries)
-   - Would duplicate an existing spec above
-   - No CSS selectors or element interactions to remember
-
-2. **A SPEC block** - if tool calls contain reusable patterns:
-
-<!--SPEC
-type: dom
-domain: ${domain}
-description: Brief description
-content: |
-  selector: "#actual-selector-from-tool-calls"
-
-  Steps:
-  1. Action with selector
-
-  Avoid: selector that failed (if any)
--->
-
-**Spec types:** dom (selectors), workflow (multi-step), api (endpoints), gotcha (workarounds)
-
-**Extract from tool calls:**
-- CSS selectors that worked (from click_element, type_text, query_selector)
-- execute_script patterns that extracted data
-- Sequences that achieved the goal
-- Fallback selectors if primary failed
-
-**DO NOT duplicate existing knowledge.**`;
-
-    try {
-      // Use a fast model for extraction
-      const extractionApi = new ClaudeAPI(claudeApi.apiKey, 'claude-haiku-4-5');
-
-      let fullResponse = '';
-
-      // Stream the response
-      const stream = extractionApi.streamMessage(
-        [{ role: 'user', content: extractionPrompt }],
-        [], // No tools needed
-        'Extract navigation patterns from browser interactions. Be concise.'
-      );
-
-      for await (const event of stream) {
-        if (event.type === 'content_block_delta' && event.delta?.text) {
-          fullResponse += event.delta.text;
-        }
-      }
-
-      console.log('[ExtractKnowledge] Response:', fullResponse);
-
-      // Check if no knowledge was generated
-      if (fullResponse.includes('NO_USEFUL_PATTERNS') || fullResponse.includes('NO_SPEC') || !fullResponse.includes('<!--SPEC')) {
-        return { success: false, error: 'No useful patterns to extract' };
-      }
-
-      // Parse SPEC blocks from response using unified parser
-      const specs = window.SiteKnowledge?.parseSpecBlocks?.(fullResponse) || [];
-
-      if (specs.length === 0) {
-        return { success: false, error: 'Could not parse knowledge' };
-      }
-
-      // Save each parsed knowledge item
-      let savedCount = 0;
-      for (const spec of specs) {
-        if (window.SiteKnowledge) {
-          const saved = await window.SiteKnowledge.add(domain, spec);
-          if (saved) {
-            savedCount++;
-            console.log('[ExtractKnowledge] Saved:', spec.description || spec.goal);
-          }
-        }
-      }
-
-      if (savedCount > 0) {
-        return { success: true, count: savedCount };
-      } else {
-        return { success: false, error: 'Knowledge was duplicate or invalid' };
-      }
-    } catch (error) {
-      console.error('[ExtractKnowledge] Error:', error);
       return { success: false, error: error.message };
     }
   }

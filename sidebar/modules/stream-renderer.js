@@ -443,23 +443,20 @@ function stripComplexityScore(text) {
 }
 
 /**
- * Adds footer to message with optional complexity score and extract specs button.
+ * Adds footer to message with optional complexity score.
  *
  * @param {HTMLElement} msgElement - The message element
  * @param {number|null} score - The complexity score (0-1), or null to hide complexity display
- * @param {Object} [callbacks] - Optional callback functions
- * @param {Function} [callbacks.onExtractSpecs] - Callback for extract specs button
  */
-function addComplexityFooter(msgElement, score, callbacks = {}) {
+function addComplexityFooter(msgElement, score) {
   const footer = document.createElement('div');
   footer.className = 'message-footer complexity-footer';
 
   // Build complexity display only if score provided
-  let complexityHtml = '';
   if (score !== null && score !== undefined) {
     const scoreDisplay = score.toFixed(2);
     const barWidth = Math.round(score * 100);
-    complexityHtml = `
+    footer.innerHTML = `
       <span class="complexity-label">Complexity:</span>
       <span class="complexity-bar">
         <span class="complexity-fill" style="width: ${barWidth}%"></span>
@@ -467,23 +464,6 @@ function addComplexityFooter(msgElement, score, callbacks = {}) {
       <span class="complexity-value">${scoreDisplay}</span>
     `;
   }
-
-  footer.innerHTML = `
-    ${complexityHtml}
-    <button class="analyze-specs-btn" title="Extract Site Specs from conversation">Extract Specs</button>
-    <span class="complexity-status"></span>
-  `;
-
-  // Add click handler for extract specs button
-  const extractBtn = footer.querySelector('.analyze-specs-btn');
-  extractBtn.addEventListener('click', async () => {
-    extractBtn.disabled = true;
-    extractBtn.textContent = '...';
-    if (callbacks.onExtractSpecs) {
-      await callbacks.onExtractSpecs(msgElement);
-    }
-    extractBtn.style.display = 'none'; // Hide button after extraction
-  });
 
   msgElement.appendChild(footer);
 }
@@ -505,103 +485,6 @@ function processComplexity(text, msgElement, callbacks = {}) {
   }
 
   return strippedText;
-}
-
-/**
- * Updates complexity footer status text and type.
- *
- * @param {HTMLElement} msgElement - The message element
- * @param {string} status - The status text
- * @param {string} [type='info'] - The status type ('info', 'success', 'error')
- */
-function updateComplexityFooterStatus(msgElement, status, type = 'info') {
-  const statusEl = msgElement.querySelector('.complexity-status');
-  if (statusEl) {
-    statusEl.textContent = status ? `· ${status}` : '';
-    statusEl.className = `complexity-status ${type}`;
-  }
-}
-
-/**
- * Handles manual spec extraction from a message.
- * Extracts conversation context and sends to background for processing.
- *
- * @param {HTMLElement} msgElement - The message element to extract from
- * @param {HTMLElement} chatContainer - The chat container element
- * @param {Object} [callbacks] - Optional callback functions
- * @param {Function} [callbacks.getCurrentDomain] - Function to get current domain
- * @param {Function} [callbacks.updateNotesBadge] - Function to update notes badge
- * @returns {Promise<void>}
- */
-async function handleManualSpecExtraction(msgElement, chatContainer, callbacks = {}) {
-  updateComplexityFooterStatus(msgElement, 'analyzing...', 'info');
-
-  try {
-    // Get message content for extraction
-    const messages = Array.from(chatContainer.querySelectorAll('.message'));
-    const msgIndex = messages.indexOf(msgElement);
-
-    const assistantContent = msgElement.querySelector('.message-content');
-    const assistantText = assistantContent?.textContent || '';
-
-    // Find preceding user message
-    let userText = '';
-    for (let i = msgIndex - 1; i >= 0; i--) {
-      if (messages[i].classList.contains('user')) {
-        userText = messages[i].querySelector('.message-content')?.textContent || '';
-        break;
-      }
-    }
-
-    // Get tool calls from activity log
-    const activityLog = assistantContent?.querySelector('.activity-log');
-    let toolInfo = '';
-    if (activityLog) {
-      const toolItems = activityLog.querySelectorAll('.activity-item');
-      toolItems.forEach(item => {
-        const name = item.querySelector('.activity-item-name')?.textContent || '';
-        const details = item.querySelector('.activity-detail-content')?.textContent || '';
-        if (name) {
-          toolInfo += `Tool: ${name}\n`;
-          if (details) toolInfo += `Input: ${details.slice(0, 300)}\n`;
-        }
-      });
-    }
-
-    // Get current domain
-    let domain = null;
-    if (callbacks.getCurrentDomain) {
-      domain = await callbacks.getCurrentDomain();
-    }
-    if (!domain) {
-      updateComplexityFooterStatus(msgElement, 'no valid domain', 'info');
-      return;
-    }
-
-    // Send to background for spec extraction
-    const result = await browser.runtime.sendMessage({
-      type: 'EXTRACT_NOTE',
-      domain: domain,
-      userRequest: userText,
-      assistantResponse: assistantText,
-      toolCalls: toolInfo
-    });
-
-    if (result?.success) {
-      const specCount = result.count || 1;
-      updateComplexityFooterStatus(msgElement, `saved ${specCount} spec${specCount > 1 ? 's' : ''}`, 'success');
-      if (callbacks.updateNotesBadge) {
-        callbacks.updateNotesBadge();
-      }
-    } else if (result?.error?.includes('No useful patterns') || result?.error?.includes('NO_USEFUL_PATTERNS')) {
-      updateComplexityFooterStatus(msgElement, 'no new patterns', 'info');
-    } else {
-      updateComplexityFooterStatus(msgElement, result?.error || 'analysis failed', 'error');
-    }
-  } catch (error) {
-    console.error('[Analyze] Extraction error:', error);
-    updateComplexityFooterStatus(msgElement, 'analysis failed', 'error');
-  }
 }
 
 // ========== Message Finalization ==========
@@ -829,8 +712,6 @@ window.StreamRenderer = {
   parseComplexityScore,
   stripComplexityScore,
   addComplexityFooter,
-  updateComplexityFooterStatus,
-  handleManualSpecExtraction,
 
   // Helpers
   createStreamingIndicator,

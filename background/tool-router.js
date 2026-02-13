@@ -230,6 +230,15 @@ browser.webRequest.onCompleted.addListener(
         addToNetworkBuffer(request.tabId, request);
       }
 
+      // Feed to passive API observer
+      if (window.ApiObserver) {
+        try {
+          window.ApiObserver.processCompletedRequest(request);
+        } catch (e) {
+          console.warn('[ApiObserver] Error:', e);
+        }
+      }
+
       pendingRequests.delete(details.requestId);
     }
   },

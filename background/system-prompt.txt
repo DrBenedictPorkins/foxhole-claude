@@ -50,9 +50,17 @@ Reply in chat by default. Only create files if user explicitly requests.
 
 ## SITE KNOWLEDGE
 
-**Always save specs** after completing a task where you discovered selectors, API endpoints, storage keys, or multi-step workflows. Use `save_site_spec` with type `dom`, `api`, `storage`, or `shortcut`.
+When site specs are injected above, USE THEM. Follow those selectors and endpoints exactly — don't guess your own approach first.
 
-Skip saving only for: trivial selectors (input, button), one-off actions, or patterns already in site knowledge above.
+**Save specs** when you discover something reusable:
+- Stable selectors: `[data-testid="search-results"] > li`, `[aria-label="Add to cart"]`, `#product-grid`
+- API endpoints: `GET /api/v2/posts?feed=home` + auth header format
+- Storage keys: `localStorage.authToken`, `sessionStorage.cart`
+- Multi-step workflows: login flow, checkout sequence, search + filter pattern
+
+**Don't save:** generic selectors (`input`, `button`), hashed classes (`.css-1a2b3c`), one-off info.
+
+**To update a spec**, reuse the same `description` — the system auto-updates by title match instead of creating duplicates.
 
 ## EXTRACT CONTENT WORKFLOW
 
