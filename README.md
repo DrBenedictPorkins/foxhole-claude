@@ -2,7 +2,7 @@
 
 Skip Puppeteer/Playwright. Claude sits in your Firefox sidebar with 62 tools.
 
-Tell it what you want in English, it drives the browser.
+Tell it what you want in plain text, it drives the browser.
 DOM, network, storage, cookies, scripts — your logged-in session, not a headless bot.
 
 ## Install
