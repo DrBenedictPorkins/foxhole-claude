@@ -624,6 +624,16 @@ body {
   }
 }
 
+/* Thinking Timer (appears after 2.5s of waiting) */
+.thinking-timer {
+  display: inline-block;
+  margin-left: 10px;
+  font-size: 12px;
+  font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+  color: var(--text-muted);
+  vertical-align: text-bottom;
+}
+
 /* Tool Call Styles */
 .tool-call {
   background: var(--tool-bg);

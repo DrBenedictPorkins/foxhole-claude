@@ -53,3 +53,60 @@ Reply in chat by default. Only create files if user explicitly requests.
 **Always save specs** after completing a task where you discovered selectors, API endpoints, storage keys, or multi-step workflows. Use `save_site_spec` with type `dom`, `api`, `storage`, or `shortcut`.
 
 Skip saving only for: trivial selectors (input, button), one-off actions, or patterns already in site knowledge above.
+
+## EXTRACT CONTENT WORKFLOW
+
+When user asks to "extract content", "declutter", or "simplify" a page:
+
+### Step 1: Probe (1 tool call)
+Use `execute_script` to scan the page and return a structured summary of content regions:
+```
+(() => {
+  const probe = (sel, label) => {
+    const els = document.querySelectorAll(sel);
+    if (!els.length) return null;
+    const sample = els[0].textContent?.trim().slice(0, 80);
+    return { label, count: els.length, selector: sel, sample };
+  };
+  return [
+    probe('article', 'Articles'),
+    probe('[role="article"]', 'Role articles'),
+    probe('main', 'Main content'),
+    probe('[role="main"]', 'Role main'),
+    probe('.post, [data-testid*="post"], [class*="post"]', 'Posts'),
+    probe('.card, [class*="card"]', 'Cards'),
+    probe('.product, [class*="product"]', 'Products'),
+    probe('[class*="item"], [class*="listing"]', 'Listings'),
+    probe('aside, [role="complementary"]', 'Sidebars'),
+    probe('nav, [role="navigation"]', 'Navigation'),
+    probe('[class*="ad"], [data-ad], [id*="ad-"]', 'Ads'),
+  ].filter(Boolean);
+})()
+```
+Adapt selectors based on the site. The goal is to identify what content exists and where.
+
+### Step 2: Ask (text response)
+Report findings to the user, e.g.: "Found 20 articles, a sidebar, and 3 ad containers. What do you want to keep?"
+Do NOT proceed until user confirms.
+
+### Step 3: Extract & Replace (1 tool call)
+Use a single `execute_script` that does everything in one shot:
+1. Select and clone the content the user wants (grab innerHTML before replacing)
+2. Stop the page: `window.stop();`
+3. Kill all timers:
+   `const id = setTimeout(()=>{},0); for(let i=0;i<=id;i++){clearTimeout(i);clearInterval(i);}`
+4. Replace head: `document.head.innerHTML = '<style>/* clean CSS */</style>';`
+5. Replace body: `document.body.innerHTML = '/* extracted content */';`
+
+The clean page should have:
+- Simple readable CSS (max-width container, clean typography)
+- A banner: "Extracted view — refresh (Ctrl+R) to restore original"
+- ONLY the content the user asked for
+
+### Notes
+- Do NOT take a screenshot to analyze the page — use the DOM probe instead (cheaper, more precise)
+- Only use a screenshot as a fallback if the DOM probe returns unclear results
+- NEVER use `document.write()` — browsers block it after page load
+- `window.stop()` + clearing timers prevents scripts from re-adding clutter
+- If the page uses infinite scroll, scroll down first to trigger lazy loading, then probe and extract
+- Save useful selectors as site specs for future extract requests on the same site

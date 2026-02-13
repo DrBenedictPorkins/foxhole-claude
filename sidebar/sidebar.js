@@ -47,6 +47,9 @@
   /** @type {Array} Tool names used during current streaming response (for conversation history) */
   let currentStreamingTools = [];
 
+  /** @type {Object|null} Thinking timer state */
+  let thinkingTimer = null;
+
   /** @type {number|null} Currently active tab ID */
   let currentTabId = null;
 
@@ -636,6 +639,7 @@
 
     const contentElement = msgElement.querySelector('.message-content');
     contentElement.innerHTML = '<span class="streaming-cursor"></span>';
+    startThinkingTimer();
 
     // Send full conversation - auto-compression handles context limits
     try {
@@ -662,9 +666,39 @@
     isStreaming = false;
     streamingTabId = null;
     pendingTabSwitch = null;
+    stopThinkingTimer();
     sendBtn.classList.remove('hidden');
     stopBtn.classList.add('hidden');
     sendBtn.disabled = userInput.value.trim().length === 0;
+  }
+
+  function startThinkingTimer() {
+    stopThinkingTimer();
+    const startTime = Date.now();
+    thinkingTimer = {
+      delayId: setTimeout(() => {
+        const cursor = chatContainer.querySelector('.streaming-cursor');
+        if (!cursor) return;
+        const timerEl = document.createElement('span');
+        timerEl.className = 'thinking-timer';
+        timerEl.textContent = '0.0s';
+        cursor.parentNode.insertBefore(timerEl, cursor.nextSibling);
+        thinkingTimer.intervalId = setInterval(() => {
+          const elapsed = (Date.now() - startTime) / 1000;
+          timerEl.textContent = elapsed.toFixed(1) + 's';
+        }, 100);
+      }, 2500),
+      intervalId: null
+    };
+  }
+
+  function stopThinkingTimer() {
+    if (!thinkingTimer) return;
+    clearTimeout(thinkingTimer.delayId);
+    if (thinkingTimer.intervalId) clearInterval(thinkingTimer.intervalId);
+    const timerEl = chatContainer.querySelector('.thinking-timer');
+    if (timerEl) timerEl.remove();
+    thinkingTimer = null;
   }
 
   async function handleStopGeneration() {
@@ -854,6 +888,7 @@
   // ============================================================================
 
   function handleStreamDelta(text) {
+    stopThinkingTimer();
     window.StreamRenderer.handleDelta(
       text,
       { currentTabId, streamingTabId },
@@ -863,6 +898,7 @@
   }
 
   function handleToolUse(toolUse) {
+    stopThinkingTimer();
     // Track tool name for conversation history
     currentStreamingTools.push(toolUse.name);
 

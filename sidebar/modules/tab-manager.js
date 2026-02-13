@@ -284,6 +284,9 @@ function getWelcomeMessageHtml() {
         <button class="prompt-btn" data-prompt="Audit this page for privacy and security issues. Check for: third-party trackers and analytics scripts, dark patterns (hidden opt-ins, misleading buttons, forced consent), exposed data in the DOM or network requests, insecure form actions, and suspicious external resource loading. Summarize findings by severity.">
           🛡️ Security Audit
         </button>
+        <button class="prompt-btn" data-prompt="Extract content from this page. Scan the DOM to see what's here, then ask me what I want to keep (e.g., just posts, just products, just articles). Once I tell you, extract that content and replace the page with a clean version — no ads, no trackers, no clutter.">
+          🧲 Extract Content
+        </button>
       </div>
     </div>
   `;

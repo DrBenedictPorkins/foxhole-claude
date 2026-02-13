@@ -10,7 +10,7 @@
 
 // Network request buffer configuration
 const NETWORK_CONFIG = {
-  maxRequests: 100,
+  maxRequests: 200,
   maxRequestBodySize: 50000,
   maxResponseBodySize: 50000
 };
@@ -1019,10 +1019,17 @@ function handleGetNetworkRequests(tabId, params) {
   const buffer = networkRequestBuffers.get(tabId) || [];
   const limit = params?.limit || 50;
   const filter = params?.filter;
+  const typeFilter = params?.type;
 
   let requests = [...buffer];
 
-  // Apply filter if provided
+  // Apply type filter if provided
+  if (typeFilter) {
+    const mapped = (typeFilter === 'xhr' || typeFilter === 'fetch') ? 'xmlhttprequest' : typeFilter;
+    requests = requests.filter(req => req.type === mapped);
+  }
+
+  // Apply text filter if provided
   if (filter) {
     const filterLower = filter.toLowerCase();
     requests = requests.filter(req =>

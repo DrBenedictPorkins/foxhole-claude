@@ -504,7 +504,9 @@
         }
       }
     } finally {
+      // Disable selection mode if it was left on during the task
       if (tabId) {
+        browser.tabs.sendMessage(tabId, { action: 'toggle_selection_mode', params: { enable: false } }, { frameId: 0 }).catch(() => {});
         activeStreams.delete(tabId);
       }
       // Reset window ID after stream completes

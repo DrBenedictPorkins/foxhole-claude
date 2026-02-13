@@ -818,8 +818,8 @@ Returns the result of the last expression.`,
         },
         type: {
           type: 'string',
-          enum: ['xhr', 'fetch', 'document', 'script', 'stylesheet', 'image', 'font', 'other'],
-          description: 'Filter by request type',
+          enum: ['xmlhttprequest', 'document', 'script', 'stylesheet', 'image', 'font', 'other'],
+          description: 'Filter by request type. "xmlhttprequest" includes both XHR and fetch() calls.',
         },
         limit: {
           type: 'number',
