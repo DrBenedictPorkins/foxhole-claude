@@ -518,11 +518,6 @@ function finalizeMessage(contentElement, finalText, callbacks = {}) {
     // Clear text container
     textContainer.innerHTML = '';
 
-    // Activity log first (if exists)
-    if (activityLog) {
-      textContainer.appendChild(activityLog);
-    }
-
     // Parse <answer> tags and render with distinct styling
     const render = callbacks.renderMarkdownContent || RenderUtils.renderMarkdownContent;
     const answerMatch = finalText.match(/<answer>([\s\S]*?)<\/answer>/);
@@ -551,6 +546,11 @@ function finalizeMessage(contentElement, finalText, callbacks = {}) {
       textDiv.className = 'response-text';
       textDiv.innerHTML = render(finalText);
       textContainer.appendChild(textDiv);
+    }
+
+    // Activity log AFTER response text — the report is the point, tools are detail
+    if (activityLog) {
+      textContainer.appendChild(activityLog);
     }
   }
 }

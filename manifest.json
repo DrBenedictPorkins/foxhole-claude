@@ -51,6 +51,7 @@
   "background": {
     "scripts": [
       "background/prompt-loader.js",
+      "background/content-sanitizer.js",
       "background/tools.js",
       "background/claude-api.js",
       "background/tool-router.js",

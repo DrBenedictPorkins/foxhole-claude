@@ -459,6 +459,48 @@
     return true; // Keep channel open for async response
   });
 
+  /**
+   * Get cleaned page content with hidden/injected elements stripped.
+   * Clones the DOM to avoid mutating the live page.
+   */
+  function getCleanedPageContent() {
+    const clone = document.documentElement.cloneNode(true);
+
+    // Remove script, style, noscript, stylesheet links
+    clone.querySelectorAll('script, style, noscript, link[rel="stylesheet"]').forEach(el => el.remove());
+
+    // Remove meta tags with content attribute (can carry hidden instructions)
+    clone.querySelectorAll('meta[content]').forEach(el => el.remove());
+
+    // Remove aria-hidden elements
+    clone.querySelectorAll('[aria-hidden="true"]').forEach(el => el.remove());
+
+    // Remove elements hidden via inline styles
+    clone.querySelectorAll('*').forEach(el => {
+      const style = el.getAttribute('style');
+      if (style) {
+        const lower = style.toLowerCase();
+        if (
+          lower.includes('display:none') || lower.includes('display: none') ||
+          lower.includes('visibility:hidden') || lower.includes('visibility: hidden') ||
+          /opacity\s*:\s*0(?:[;\s]|$)/.test(lower)
+        ) {
+          el.remove();
+        }
+      }
+    });
+
+    // Remove HTML comment nodes (recursive walk)
+    const walker = document.createTreeWalker(clone, NodeFilter.SHOW_COMMENT, null, false);
+    const comments = [];
+    while (walker.nextNode()) {
+      comments.push(walker.currentNode);
+    }
+    comments.forEach(c => c.parentNode && c.parentNode.removeChild(c));
+
+    return clone.outerHTML;
+  }
+
   async function handleCommand(action, params) {
     switch (action) {
       case 'ping':
@@ -466,7 +508,7 @@
 
       case 'get_dom':
       case 'get_page_content':
-        return { html: document.documentElement.outerHTML };
+        return { html: getCleanedPageContent() };
 
       case 'get_page_text':
         return { text: document.body.innerText };

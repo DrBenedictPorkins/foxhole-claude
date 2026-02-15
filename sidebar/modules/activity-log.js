@@ -358,36 +358,24 @@ ${htmlContent}
       const blob = new Blob([fullHtml], { type: 'text/html' });
       const blobUrl = URL.createObjectURL(blob);
 
-      // Open in new tab - use browser.tabs.create for extension context
+      // Fire-and-forget: don't await — browser.tabs.create can hang from sidebar context
       let opened = false;
-      if (typeof browser !== 'undefined' && browser.tabs) {
-        try {
-          await browser.tabs.create({ url: blobUrl });
-          opened = true;
-        } catch (tabErr) {
-          console.error('tabs.create failed:', tabErr);
-          // Fallback to window.open
-          const win = window.open(blobUrl, '_blank');
-          opened = win !== null;
-        }
-      } else {
-        const win = window.open(blobUrl, '_blank');
-        opened = win !== null;
+      try {
+        browser.tabs.create({ url: blobUrl });
+        opened = true;
+      } catch (tabErr) {
+        console.error('tabs.create failed:', tabErr);
       }
 
-      // Update button state
-      if (opened) {
-        htmlBtn.textContent = '✓ Opened';
-      } else {
-        htmlBtn.textContent = '✗ Blocked';
-      }
+      // Update button immediately (don't wait for tab)
+      htmlBtn.textContent = opened ? '✓ Opened' : '✗ Failed';
       setTimeout(() => {
         htmlBtn.innerHTML = '🌐 View as HTML';
         htmlBtn.disabled = false;
       }, 1500);
 
-      // Clean up blob URL after a delay (tab should have loaded by then)
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+      // Clean up blob URL after tab has had time to load
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
 
     } catch (err) {
       console.error('HTML conversion failed:', err);

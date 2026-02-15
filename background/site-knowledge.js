@@ -620,22 +620,51 @@ function formatForPrompt(items, domain) {
     return bScore - aScore;
   }).slice(0, MAX_SPECS_IN_PROMPT);
 
-  let text = '\n\n';
-  text += '======================================================================\n';
-  text += '  STOP! READ THESE KNOWN PATTERNS BEFORE DOING ANYTHING\n';
-  text += '======================================================================\n\n';
-  text += `## VERIFIED PATTERNS FOR ${domain.toUpperCase()}\n\n`;
-  text += '**IMPORTANT: Patterns are listed NEWEST FIRST. If two patterns conflict, follow the NEWER one.**\n';
-  text += '**Follow these patterns exactly - do not try your own approach first.**\n\n';
+  // Extract profile (always first, distinct formatting)
+  const profile = sorted.find(item => item.type === 'profile');
+  const rest = sorted.filter(item => item.type !== 'profile');
 
-  for (const item of sorted) {
+  let text = '\n\n';
+
+  // Render profile first with distinct formatting
+  if (profile) {
+    text += '\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n';
+    text += '\u2551  SITE PROFILE \u2014 READ THIS FIRST                            \u2551\n';
+    text += '\u255A\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255D\n\n';
+    text += profile.content + '\n\n';
+    text += '\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\n';
+  }
+
+  text += '======================================================================\n';
+  text += '  KNOWN PATTERNS — use these first, but verify if stale\n';
+  text += '======================================================================\n\n';
+  text += `## PATTERNS FOR ${domain.toUpperCase()}\n\n`;
+  text += '**Newest first. If two conflict, follow the newer one.**\n';
+  text += '**If a spec fails (selector missing, endpoint 404), delete it with delete_site_spec and save a corrected one.**\n\n';
+
+  for (const item of rest) {
     const age = getRelativeAge(item.created);
     const typeBadge = item.type ? `[${item.type}]` : '';
 
-    text += `### ${item.title} ${typeBadge} ${age ? `(${age})` : ''}\n\n`;
+    // Staleness warning based on age
+    const diffDays = item.created ? Math.floor((Date.now() - item.created) / 86400000) : 0;
+    let staleBadge = '';
+    if (diffDays > 60) {
+      staleBadge = ' [STALE — verify before using]';
+    } else if (diffDays > 21) {
+      staleBadge = ' [aging — may need refresh]';
+    }
+
+    text += `### ${item.title} ${typeBadge} ${age ? `(${age})` : ''}${staleBadge}\n`;
+    if (item.id) {
+      text += `*spec_id: ${item.id}*\n`;
+    }
+    text += '\n';
 
     if (item.content) {
-      text += '```\n' + item.content + '\n```\n\n';
+      // Escape triple backticks in content to prevent code fence breakout
+      const escapedContent = item.content.replace(/```/g, '`\u200B``');
+      text += '```\n' + escapedContent + '\n```\n\n';
     }
 
     if (item.selector) {
@@ -645,7 +674,7 @@ function formatForPrompt(items, domain) {
     text += '---\n\n';
   }
 
-  text += '**REMINDER: Newer patterns override older ones. Follow the first matching pattern.**\n\n';
+  text += '**REMINDER: Stale specs waste turns. If something fails, delete + re-save rather than working around it.**\n\n';
 
   return text;
 }

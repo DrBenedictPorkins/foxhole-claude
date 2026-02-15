@@ -486,6 +486,8 @@ async function executeTool(toolName, toolInput) {
       // Site Specs
       case 'save_site_spec':
         return await handleSaveSiteSpec(tab, toolInput);
+      case 'delete_site_spec':
+        return await handleDeleteSiteSpec(tab, toolInput);
 
       // External Fetch
       case 'fetch_url':
@@ -1390,7 +1392,7 @@ async function handleSaveSiteSpec(tab, params) {
   }
 
   // Validate type
-  const validTypes = ['dom', 'api', 'storage', 'shortcut'];
+  const validTypes = ['profile', 'dom', 'api', 'storage', 'shortcut'];
   if (!validTypes.includes(type)) {
     return { success: false, error: `Invalid type: ${type}. Must be one of: ${validTypes.join(', ')}` };
   }
@@ -1405,10 +1407,15 @@ async function handleSaveSiteSpec(tab, params) {
   }
 
   // Build knowledge item (SiteKnowledge API expects 'title' not 'description')
+  // Note: spec content is authored by Claude, not read from pages.
+  // Injection defense (layers 1-3) already sanitized page content before Claude saw it.
+  // Only escape backticks here to prevent structural breakout in prompt formatting.
+  const safeContent = content.replace(/```/g, '`\u200B``');
+
   const item = {
     type,
     title: description,
-    content,
+    content: safeContent,
     path: '*'
   };
 
@@ -1416,6 +1423,24 @@ async function handleSaveSiteSpec(tab, params) {
   try {
     if (!window.SiteKnowledge) {
       return { success: false, error: 'SiteKnowledge module not available' };
+    }
+
+    // Enforce one profile per domain — auto-update if exists
+    if (type === 'profile') {
+      const existing = await window.SiteKnowledge.get(domain);
+      const existingProfile = existing?.find(e => e.type === 'profile');
+      if (existingProfile) {
+        const updated = await window.SiteKnowledge.update(domain, existingProfile.id, {
+          type: 'profile',
+          title: description,
+          content: safeContent,
+          path: '*'
+        });
+        if (updated) {
+          console.log(`[SiteKnowledge] Tool updated site profile for ${domain}`);
+          return { success: true, message: `Updated site profile for ${domain}`, action: 'updated', spec: updated };
+        }
+      }
     }
 
     // Check for existing spec with same title
@@ -1426,7 +1451,7 @@ async function handleSaveSiteSpec(tab, params) {
       // Update existing spec with new content
       const updated = await window.SiteKnowledge.update(domain, match.id, {
         type,
-        content,
+        content: safeContent,
         path: '*'
       });
       if (updated) {
@@ -1460,7 +1485,36 @@ async function handleSaveSiteSpec(tab, params) {
 }
 
 // ==========================================================================
-// Export for use by background.js
+// Delete Site Spec Handler
+// ==========================================================================
+
+async function handleDeleteSiteSpec(tab, params) {
+  const { spec_id, reason } = params;
+
+  if (!spec_id) {
+    return { success: false, error: 'spec_id is required' };
+  }
+
+  const domain = new URL(tab.url).hostname.replace(/^www\./, '');
+
+  try {
+    if (!window.SiteKnowledge) {
+      return { success: false, error: 'SiteKnowledge module not available' };
+    }
+
+    const deleted = await window.SiteKnowledge.delete(domain, spec_id);
+    if (deleted) {
+      console.log(`[SiteKnowledge] Deleted spec ${spec_id} from ${domain}${reason ? ': ' + reason : ''}`);
+      return { success: true, message: `Deleted spec from ${domain}${reason ? ' (' + reason + ')' : ''}` };
+    }
+
+    return { success: false, error: `Spec ${spec_id} not found for ${domain}` };
+  } catch (error) {
+    console.error('[SiteKnowledge] Delete error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
 // ==========================================================================
 // Fetch URL Handler
 // ==========================================================================

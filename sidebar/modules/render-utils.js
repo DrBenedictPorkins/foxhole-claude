@@ -28,7 +28,8 @@ function renderMarkdownContent(text) {
   if (typeof marked !== 'undefined') {
     // Enable GFM line breaks: single \n becomes <br>
     marked.setOptions({ breaks: true, gfm: true });
-    return marked.parse(text);
+    // Wrap <table> elements in a scrollable container for narrow sidebar
+    return marked.parse(text).replace(/<table>/g, '<div class="table-wrapper"><table>').replace(/<\/table>/g, '</table></div>');
   }
 
   // Fallback: basic rendering if marked isn't loaded

@@ -779,12 +779,35 @@
       if (toolUses.length > 0) {
         await handleToolCalls(toolUses, conversation, currentAssistantContent, tabId, tabUrl, signal, iteration);
       } else {
+        // Check if Claude narrated a planned action without actually calling a tool.
+        // Common pattern: "Let me take a screenshot..." or "I'll click..." without a tool_use block.
+        // Auto-nudge Claude to continue instead of leaving the conversation dead.
+        const assistantText = currentAssistantContent
+          .filter(c => c.type === 'text')
+          .map(c => c.text)
+          .join('\n');
+
+        const STALLED_PATTERN = /\b(let me|i'll|i will|now i|going to|about to)\b.{0,30}\b(screenshot|click|check|verify|take a|look at|scroll|query|execute|navigate|search)\b/i;
+        const MAX_AUTO_CONTINUES = 3;
+
+        if (STALLED_PATTERN.test(assistantText) && iteration < MAX_AUTO_CONTINUES) {
+          console.warn(`[AutoContinue] Claude narrated a planned action without a tool call. Nudging to continue (iteration ${iteration + 1}).`);
+          sendToSidebar({
+            type: 'STREAM_DELTA',
+            text: '\n*[continuing...]*\n'
+          });
+
+          const nudgeConversation = [
+            ...conversation,
+            { role: 'assistant', content: currentAssistantContent },
+            { role: 'user', content: 'You described an action but didn\'t execute it. Do it now — include the tool call.' }
+          ];
+          await streamConversation(nudgeConversation, tabId, tabUrl, signal, iteration + 1, continuationCount);
+          return;
+        }
+
         // Task complete - store in history for future reference
         if (currentTaskUserMessage) {
-          const assistantText = currentAssistantContent
-            .filter(c => c.type === 'text')
-            .map(c => c.text)
-            .join('\n');
           addTaskToHistory(currentTaskUserMessage, assistantText);
           currentTaskUserMessage = null;  // Reset for next task
         }
@@ -1029,8 +1052,14 @@
             if (typeof content === 'string') {
               totalChars += content.length;
             } else if (Array.isArray(content)) {
-              // Image or complex content
-              totalChars += 1000; // Rough estimate for images
+              // Image or complex content — count each block individually
+              for (const item of content) {
+                if (item.type === 'image') {
+                  totalChars += 100000; // base64 screenshots are ~100KB
+                } else if (item.type === 'text') {
+                  totalChars += (item.text || '').length;
+                }
+              }
             }
           }
         }
@@ -1042,8 +1071,19 @@
 
   // Context limits
   const MAX_CONTEXT_TOKENS = 200000; // Claude's context window
-  const COMPRESSION_THRESHOLD = 0.80; // Compress at 80%
+  const COMPRESSION_THRESHOLD = 0.60; // Compress at 60% — leaves headroom for system prompt + tools (~25k)
   const KEEP_RECENT_TURNS = 4; // Always keep last N turns intact
+
+  /**
+   * Extract the semantic summary stamped on tool results at creation time.
+   * Format: "[TOOL_SUMMARY] [toolName] description...\n<actual content>"
+   * Returns the summary string or null if not found.
+   */
+  function extractToolSummary(content) {
+    if (typeof content !== 'string') return null;
+    const match = content.match(/^\[TOOL_SUMMARY\] (.*)\n/);
+    return match ? match[1] : null;
+  }
 
   /**
    * Compress conversation history by replacing verbose tool results with summaries
@@ -1059,16 +1099,16 @@
             ...msg,
             content: msg.content.map(c => {
               if (c.type === 'tool_result') {
-                // Compress tool result content if it's large
                 let content = c.content;
                 if (typeof content === 'string' && content.length > 500) {
-                  // Already verbose - try to extract key info or truncate
-                  content = `[Previous result: ${content.slice(0, 200)}...]`;
+                  // Use semantic summary if available, otherwise fall back to truncation
+                  const summary = extractToolSummary(content);
+                  content = summary || `[Previous result: ${content.slice(0, 200)}...]`;
                 } else if (Array.isArray(content)) {
                   // Image content - keep reference but not data
                   const hasImage = content.some(item => item.type === 'image');
                   if (hasImage) {
-                    content = '[Previous result: screenshot captured]';
+                    content = '[screenshot taken]';
                   }
                 }
                 return { ...c, content };
@@ -1178,7 +1218,9 @@
             ...msg,
             content: msg.content.map(c => {
               if (c.type === 'tool_result' && typeof c.content === 'string' && c.content.length > 2000) {
-                return { ...c, content: c.content.slice(0, 2000) + '\n[... truncated ...]' };
+                // Even in recent turns, use semantic summary when context is tight
+                const summary = extractToolSummary(c.content);
+                return { ...c, content: summary || c.content.slice(0, 500) + '\n[... truncated ...]' };
               }
               return c;
             })
@@ -1196,18 +1238,79 @@
   }
 
   /**
-   * Check if conversation needs compression and compress if necessary
+   * Lightweight progressive compression that runs every call.
+   * - Strips screenshots from all but the last 2 turns
+   * - Truncates tool results older than 4 turns to 500 chars
+   * Non-destructive to recent context.
+   * @param {Array} conversation - The conversation array
+   * @returns {Array} Progressively compressed conversation
+   */
+  function progressiveCompress(conversation) {
+    if (conversation.length <= 8) return conversation; // Too short to bother
+
+    const recentTurnBoundary = conversation.length - 4; // last 2 turns (user+assistant pairs)
+    const toolTruncBoundary = conversation.length - 8;  // last 4 turns
+
+    return conversation.map((msg, i) => {
+      if (msg.role !== 'user' || !Array.isArray(msg.content)) return msg;
+
+      const needsImageStrip = i < recentTurnBoundary;
+      const needsToolTrunc = i < toolTruncBoundary;
+
+      if (!needsImageStrip && !needsToolTrunc) return msg;
+
+      const hasTargetContent = msg.content.some(c =>
+        c.type === 'tool_result' && (
+          (needsImageStrip && Array.isArray(c.content) && c.content.some(item => item.type === 'image')) ||
+          (needsToolTrunc && typeof c.content === 'string' && c.content.length > 500)
+        )
+      );
+
+      if (!hasTargetContent) return msg;
+
+      return {
+        ...msg,
+        content: msg.content.map(c => {
+          if (c.type !== 'tool_result') return c;
+
+          // Strip screenshots from older turns
+          if (needsImageStrip && Array.isArray(c.content)) {
+            const hasImage = c.content.some(item => item.type === 'image');
+            if (hasImage) {
+              return { ...c, content: '[screenshot taken]' };
+            }
+          }
+
+          // Replace old tool results with semantic summary
+          if (needsToolTrunc && typeof c.content === 'string' && c.content.length > 500) {
+            const summary = extractToolSummary(c.content);
+            return { ...c, content: summary || c.content.slice(0, 200) + '\n[... truncated ...]' };
+          }
+
+          return c;
+        })
+      };
+    });
+  }
+
+  /**
+   * Check if conversation needs compression and compress if necessary.
+   * Always runs lightweight progressive compression first, then checks
+   * whether aggressive compression is also needed.
    * @param {Array} conversation - The conversation array
    * @returns {Array} Original or compressed conversation
    */
   function maybeCompressConversation(conversation) {
+    // Always run lightweight progressive compression
+    conversation = progressiveCompress(conversation);
+
     const estimatedTokens = estimateConversationTokens(conversation);
     const threshold = MAX_CONTEXT_TOKENS * COMPRESSION_THRESHOLD;
 
     console.log(`[ContextCompression] Estimated tokens: ${estimatedTokens}, threshold: ${threshold}`);
 
     if (estimatedTokens > threshold) {
-      console.log(`[ContextCompression] Triggering compression (${estimatedTokens} > ${threshold})`);
+      console.log(`[ContextCompression] Triggering aggressive compression (${estimatedTokens} > ${threshold})`);
       return aggressivelyCompressConversation(conversation);
     }
 
@@ -1357,6 +1460,22 @@
             resultStr = resultStr.slice(0, 50000) + '\n... [TRUNCATED - result too large]';
           }
 
+          // Sanitize page-reading tool results for prompt injection defense
+          const PAGE_READING_TOOLS = new Set([
+            'get_page_content', 'get_page_text', 'get_dom_structure', 'query_selector',
+            'execute_script', 'fetch_url', 'get_local_storage', 'get_session_storage',
+            'get_cookies', 'get_network_requests', 'read_image', 'get_page_metadata'
+          ]);
+
+          if (PAGE_READING_TOOLS.has(name) && window.ContentSanitizer) {
+            resultStr = window.ContentSanitizer.sanitizeForConversation(resultStr, name);
+            resultStr = `[PAGE_CONTENT_START]\n${resultStr}\n[PAGE_CONTENT_END]`;
+          }
+
+          // Stamp summary for compression — lets compressor keep semantic summary
+          // instead of truncating raw data to useless fragments
+          resultStr = `[TOOL_SUMMARY] ${summary}\n${resultStr}`;
+
           toolResults.push({
             type: 'tool_result',
             tool_use_id: id,
@@ -1379,7 +1498,7 @@
         toolResults.push({
           type: 'tool_result',
           tool_use_id: id,
-          content: JSON.stringify({ error: error.message }),
+          content: `[TOOL_SUMMARY] ${errorSummary}\n${JSON.stringify({ error: error.message })}`,
           is_error: true
         });
 
@@ -1592,6 +1711,7 @@
             // Raw knowledge is already formatted markdown - inject with clear header
             dynamicContext += `\n\n╔══════════════════════════════════════════════════════════════╗
 ║  SITE KNOWLEDGE FOR: ${domain.padEnd(41)}║
+║  ⚠ USE THESE SPECS FIRST — do not rediscover what's below  ║
 ╚══════════════════════════════════════════════════════════════╝
 
 ${rawKnowledge}
@@ -1650,18 +1770,12 @@ ${rawKnowledge}
     }
 
     // Return structured array for prompt caching
-    // Static base prompt is cached (large, never changes)
-    // Dynamic context is cached (stable per domain within tab session)
+    // Dynamic context FIRST so Claude has site knowledge in mind before reading instructions.
+    // Static base prompt second (instructions reference "site knowledge above").
     const basePrompt = getSystemPrompt();
-    const systemBlocks = [
-      {
-        type: 'text',
-        text: basePrompt,
-        cache_control: { type: 'ephemeral' }  // Cache the static base prompt (~4-5k tokens)
-      }
-    ];
+    const systemBlocks = [];
 
-    // Add dynamic context as separate block (cached - stable per domain within tab session)
+    // Dynamic context first (site knowledge, API patterns, DOM patterns, mode)
     if (dynamicContext.trim()) {
       systemBlocks.push({
         type: 'text',
@@ -1669,6 +1783,13 @@ ${rawKnowledge}
         cache_control: { type: 'ephemeral' }
       });
     }
+
+    // Static base prompt second (cached — large, never changes)
+    systemBlocks.push({
+      type: 'text',
+      text: basePrompt,
+      cache_control: { type: 'ephemeral' }
+    });
 
     console.log(`[PromptCache] Built system prompt: ${systemBlocks.length} blocks, static=${basePrompt.length} chars, dynamic=${dynamicContext.length} chars`);
 

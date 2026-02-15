@@ -149,7 +149,8 @@ class ClaudeAPI {
 
     let response;
     let lastError;
-    const maxRetries = 2;
+    const maxRetries = 3;
+    const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 529]);
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
@@ -164,12 +165,22 @@ class ClaudeAPI {
           },
           body: JSON.stringify(requestBody)
         });
-        break; // Success, exit retry loop
+
+        // Retry on transient server errors (429, 500, 502, 503, 529)
+        if (RETRYABLE_STATUSES.has(response.status) && attempt < maxRetries) {
+          const delay = response.status === 529
+            ? 2000 * (attempt + 1)  // Overloaded: longer backoff (2s, 4s, 6s)
+            : 1000 * (attempt + 1); // Other: standard backoff (1s, 2s, 3s)
+          console.warn(`[ClaudeAPI] ${response.status} ${response.statusText} (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+
+        break; // Success or non-retryable status, exit loop
       } catch (networkError) {
         lastError = networkError;
         console.warn(`[ClaudeAPI] Network error (attempt ${attempt + 1}/${maxRetries + 1}):`, networkError.message);
         if (attempt < maxRetries) {
-          // Wait before retry (exponential backoff: 1s, 2s)
           await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
         }
       }
@@ -179,7 +190,7 @@ class ClaudeAPI {
       throw new Error(`Network error after ${maxRetries + 1} attempts: ${lastError?.message || 'Unknown error'}. Please check your internet connection.`);
     }
 
-    // Handle non-200 responses
+    // Handle non-200 responses (after retries exhausted)
     if (!response.ok) {
       let errorMessage = `API error: ${response.status} ${response.statusText}`;
 
@@ -200,6 +211,8 @@ class ClaudeAPI {
           throw new Error('Access forbidden. Your API key may not have access to this model.');
         case 429:
           throw new Error('Rate limit exceeded. Please wait a moment before sending another message.');
+        case 529:
+          throw new Error('Anthropic API is overloaded. Please try again in a few seconds.');
         case 500:
         case 502:
         case 503:

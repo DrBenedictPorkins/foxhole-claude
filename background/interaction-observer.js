@@ -76,8 +76,12 @@
 
     if (SELECTOR_TOOLS.has(toolName)) {
       toolLabel = SELECTOR_TOOLS.get(toolName);
-      const sel = toolInput.selector;
+      let sel = toolInput.selector;
       if (sel && typeof sel === 'string') {
+        // Cap selector length to prevent bloated storage
+        if (sel.length > 100) {
+          sel = sel.slice(0, 100);
+        }
         selectors.push(sel);
       }
     } else if (MULTI_SELECTOR_TOOLS.has(toolName)) {

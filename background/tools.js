@@ -972,8 +972,8 @@ Domain is auto-detected from the current tab.`,
       properties: {
         type: {
           type: 'string',
-          enum: ['dom', 'api', 'storage', 'shortcut'],
-          description: 'Type of spec: dom (CSS selectors), api (endpoints), storage (localStorage/cookies), shortcut (multi-step workflows)',
+          enum: ['profile', 'dom', 'api', 'storage', 'shortcut'],
+          description: 'Type of spec: profile (site interaction model — ONE per domain, always read first), dom (CSS selectors), api (endpoints), storage (localStorage/cookies), shortcut (multi-step workflows)',
         },
         description: {
           type: 'string',
@@ -985,6 +985,33 @@ Domain is auto-detected from the current tab.`,
         },
       },
       required: ['type', 'description', 'content'],
+    },
+  },
+
+  {
+    name: 'delete_site_spec',
+    description: `Delete a site spec that is broken, outdated, or no longer relevant.
+
+USE WHEN:
+- A selector no longer matches anything on the page
+- An API endpoint returns 404 or has changed
+- A workflow no longer works after a site redesign
+- A spec is redundant (covered by a newer spec)
+
+Domain is auto-detected from the current tab.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        spec_id: {
+          type: 'string',
+          description: 'The spec ID shown as "spec_id: ..." in the site knowledge section above the system prompt',
+        },
+        reason: {
+          type: 'string',
+          description: 'Brief reason for deletion (e.g., "selector no longer exists after site redesign")',
+        },
+      },
+      required: ['spec_id'],
     },
   },
 
