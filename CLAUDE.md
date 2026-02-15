@@ -111,11 +111,26 @@ In `stream-renderer.js:finalizeMessage()`, the DOM order is:
 1. Response text (the useful output — front and center)
 2. Activity log (collapsible tool calls — below, expandable if curious)
 
+## Versioning & Release — MANDATORY
+
+All work happens on `develop`. Releases go to `master`.
+
+| Step | Command | Example |
+|------|---------|---------|
+| 1. Commit work on `develop` | `git commit` | develop at 1.8.0 |
+| 2. Merge to master | `git checkout master && git merge develop && git push origin master` | master becomes 1.8.0 |
+| 3. Bump develop to next minor | Back on `develop`, bump `manifest.json` version, commit, push | develop becomes 1.9.0 |
+
+**Rules:**
+- `develop` version is ALWAYS one minor version ahead of `master` — no exceptions
+- After every merge to master, immediately bump develop and push
+- Hotfixes on master use patch bumps (e.g., 1.8.1) — develop stays where it is
+- Version in `manifest.json` must be pure numeric `major.minor.patch` — Firefox rejects suffixes like `-dev`
+- The version number doubles as a dev/release indicator: if the extension shows 1.9.0 in `about:debugging`, you're running develop
+
 ## Conventions
 
 - No build step — raw JS/CSS/HTML loaded directly by Firefox
-- Manifest version must be pure numeric `major.minor.patch` — Firefox rejects suffixes like `-dev` or `-beta`
-- `develop` branch is always one minor version ahead of `master`
 - State stored in `browser.storage.local`
 - CSS uses custom properties defined in `:root` in `sidebar.css`
 - No generic `.hidden` utility class — use scoped `.modal.hidden` or `style.display`
