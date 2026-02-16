@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Foxhole for Claude",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "description": "Chat with Claude to control your Firefox browser",
 
   "browser_specific_settings": {
