@@ -284,12 +284,18 @@
         handleChatMessage(payload, sender);
         return true;
 
-      case 'SET_AUTONOMY_MODE':
-        // Store per-tab autonomy mode
-        if (payload.tabId) {
-          tabAutonomyModes.set(payload.tabId, payload.mode);
+      case 'SET_AUTONOMY_MODE': {
+        // Store per-tab autonomy mode using the actual active tab ID
+        // (sidebar's currentTabId can diverge from browser.tabs.query result)
+        const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
+        const modeTabId = activeTab?.id || payload.tabId;
+        if (modeTabId) {
+          tabAutonomyModes.set(modeTabId, payload.mode);
         }
+        // Also set the default so new tabs inherit it
+        defaultAutonomyMode = payload.mode;
         return true;
+      }
 
       case 'TAKE_SCREENSHOT':
         return handleTakeScreenshot();
