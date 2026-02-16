@@ -128,6 +128,15 @@ All work happens on `develop`. Releases go to `master`.
 - Version in `manifest.json` must be pure numeric `major.minor.patch` — Firefox rejects suffixes like `-dev`
 - The version number doubles as a dev/release indicator: if the extension shows 1.9.0 in `about:debugging`, you're running develop
 
+## AMO (Firefox Add-ons) Distribution
+
+Extension is submitted to addons.mozilla.org from `master` branch.
+
+- **`data_collection_permissions`** in `manifest.json` — required by AMO. Declares `websiteContent` and `browsingActivity` as required (page content and URLs flow to Anthropic's API)
+- **Third-party libraries** must have source attribution in `sidebar/lib/README.md` — AMO requires this for any minified code
+- **`unsafe-eval`** — justified as AI-powered devtools console. `execute_script` is gated behind user confirmation modal. No remote code loading. Reviewer notes explain both eval paths (`eval()` in content script, `new Function()` in tool-router)
+- **AMO zip** is built from `master` with exclusions: `.git/`, `.idea/`, `HANDOFF.md`, `CLAUDE.md`, `docs/`, `.DS_Store`
+
 ## Conventions
 
 - No build step — raw JS/CSS/HTML loaded directly by Firefox
