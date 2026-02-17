@@ -805,15 +805,9 @@
           <p class="iteration-prompt-text">Claude has made ${currentIteration} tool calls. Allow more?</p>
           <div class="iteration-prompt-buttons">
             <div class="iteration-more-buttons">
-              <button class="iteration-btn" data-allow="5">+5 more</button>
               <button class="iteration-btn" data-allow="10">+10 more</button>
-              <button class="iteration-btn" data-allow="15">+15 more</button>
-              <button class="iteration-btn" data-allow="20">+20 more</button>
               <button class="iteration-btn unlimited-btn" data-allow="-1">Unlimited</button>
-            </div>
-            <div class="iteration-stop-row">
               <button class="iteration-btn stop-now-btn" data-allow="-2">Stop</button>
-              <button class="iteration-btn iteration-stop-summarize" data-allow="0">Stop & Summarize</button>
             </div>
           </div>
         </div>
