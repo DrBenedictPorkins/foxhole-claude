@@ -31,7 +31,8 @@
     "downloads",
     "downloads.open",
     "sessions",
-    "bookmarks"
+    "bookmarks",
+    "browsingData"
   ],
 
   "sidebar_action": {

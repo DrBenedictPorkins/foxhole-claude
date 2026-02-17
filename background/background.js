@@ -19,6 +19,7 @@
   let currentTaskMaxIterations = 15; // Effective limit for current task (may be increased by user during task)
   let currentTaskToolCallCount = 0; // Actual tool call count for current task
   const HARD_TOOL_CALL_CAP = 200; // Absolute maximum tool calls even in "unlimited" mode
+  let recentToolCalls = []; // Loop detection: { name, summary }
   let configuredHighRiskTools = ['click_element', 'type_text', 'navigate', 'execute_script', 'fill_form', 'press_key']; // Default high-risk tools
   let debugMode = false; // Log full API requests when enabled
   let pendingToolConfirmations = new Map();
@@ -452,6 +453,7 @@
     // Reset iteration limit and tool call count at start of new task
     currentTaskMaxIterations = configuredMaxToolIterations;
     currentTaskToolCallCount = 0;
+    recentToolCalls = [];
 
     // Store window ID for targeted message sending
     currentStreamWindowId = windowId || null;
@@ -1013,6 +1015,33 @@
         }
         return `[fetch_url] Fetched "${result.title || input.url}" (${result.contentLength} chars${result.truncated ? ', truncated' : ''})`;
 
+      case 'clear_browsing_data':
+        return `[clear_browsing_data] Cleared: ${(input.dataTypes || []).join(', ')}`;
+
+      case 'list_indexeddb': {
+        const dbCount = result.databases?.length || 0;
+        return `[list_indexeddb] Found ${dbCount} database(s)`;
+      }
+
+      case 'clear_indexeddb':
+        return `[clear_indexeddb] Deleted ${(result.deleted || []).length} database(s)`;
+
+      case 'list_cache_storage': {
+        const cacheCount = result.caches?.length || 0;
+        return `[list_cache_storage] Found ${cacheCount} cache(s)`;
+      }
+
+      case 'clear_cache_storage':
+        return `[clear_cache_storage] Deleted ${(result.deleted || []).length} cache(s)`;
+
+      case 'search_history': {
+        const histCount = result.results?.length || 0;
+        return `[search_history] Found ${histCount} history entries`;
+      }
+
+      case 'delete_history':
+        return `[delete_history] ${result.message || 'History deleted'}`;
+
       default:
         // Generic summary
         const resultStr = JSON.stringify(result);
@@ -1021,6 +1050,33 @@
         }
         return `[${toolName}] ${resultStr.slice(0, 200)}`;
     }
+  }
+
+  // Detect repetitive tool call patterns (loops)
+  function detectToolLoop(calls) {
+    if (calls.length < 3) return null;
+
+    // Single-tool repeat: same name + same summary 3x in a row
+    const last3 = calls.slice(-3);
+    if (last3.every(c => c.name === last3[0].name && c.summary === last3[0].summary)) {
+      return `You have called "${last3[0].name}" 3 times in a row with the same result each time. ` +
+             `You are stuck in a loop. Do NOT call this tool again with the same approach. ` +
+             `Stop and tell the user what you were trying to do and why it isn't working.`;
+    }
+
+    // Two-tool cycle: A,B,A,B with same summaries
+    if (calls.length >= 4) {
+      const last4 = calls.slice(-4);
+      if (last4[0].name === last4[2].name && last4[1].name === last4[3].name &&
+          last4[0].name !== last4[1].name &&
+          last4[0].summary === last4[2].summary && last4[1].summary === last4[3].summary) {
+        return `You are repeating "${last4[0].name}" then "${last4[1].name}" in a loop with the same results each time. ` +
+               `You are stuck. Do NOT repeat this pattern. ` +
+               `Stop and tell the user what you were trying to do and why it isn't working.`;
+      }
+    }
+
+    return null;
   }
 
   // Helper to count nodes in DOM structure result
@@ -1417,6 +1473,8 @@
         // Create summary for history storage
         const summary = summarizeToolResult(name, input, result);
         toolSummaries.push({ id, name, input, summary });
+        recentToolCalls.push({ name, summary });
+        if (recentToolCalls.length > 10) recentToolCalls.shift();
 
         // Handle image results specially - use image content block for Claude vision
         if (result.screenshot) {
@@ -1515,6 +1573,12 @@
           isError: true
         });
       }
+    }
+
+    // Inject loop warning if repetitive pattern detected
+    const loopWarning = detectToolLoop(recentToolCalls);
+    if (loopWarning) {
+      toolResults.push({ type: 'text', text: `[SYSTEM] ${loopWarning}` });
     }
 
     // If there were tool results, continue the conversation

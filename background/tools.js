@@ -715,6 +715,136 @@ const BROWSER_TOOLS = [
   },
 
   // ============================================================================
+  // BROWSING DATA & ADVANCED STORAGE
+  // ============================================================================
+  {
+    name: 'clear_browsing_data',
+    description: `Bulk clear browser data via browser.browsingData API.
+
+Clears one or more data types across all domains or for a specific time range.
+
+USE FOR: Clearing browser cache, cookies, history, form data, downloads, service workers, localStorage in bulk.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        dataTypes: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: ['cache', 'cookies', 'history', 'formData', 'downloads', 'serviceWorkers', 'localStorage'],
+          },
+          description: 'Data types to clear (e.g., ["cache", "cookies"])',
+        },
+        since: {
+          type: 'number',
+          description: 'Only clear data from the last N minutes (e.g., 60 = last hour). Omit to clear all time.',
+        },
+        originTypes: {
+          type: 'string',
+          enum: ['unprotectedWeb', 'protectedWeb', 'extension'],
+          description: 'Origin type filter (default: unprotectedWeb)',
+        },
+      },
+      required: ['dataTypes'],
+    },
+  },
+  {
+    name: 'list_indexeddb',
+    description: 'List all IndexedDB databases on the current page. Returns database names and versions.',
+    input_schema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'clear_indexeddb',
+    description: 'Delete one or all IndexedDB databases on the current page.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Specific database name to delete. Omit to delete ALL databases.',
+        },
+      },
+    },
+  },
+  {
+    name: 'list_cache_storage',
+    description: 'List all Cache Storage caches (Service Worker caches) on the current page.',
+    input_schema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'clear_cache_storage',
+    description: 'Delete one or all Cache Storage caches on the current page.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Specific cache name to delete. Omit to delete ALL caches.',
+        },
+      },
+    },
+  },
+  {
+    name: 'search_history',
+    description: 'Search browser history for pages matching a query.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Search text to match against URLs and titles',
+        },
+        maxResults: {
+          type: 'number',
+          description: 'Maximum results to return (default: 25)',
+        },
+        startTime: {
+          type: 'string',
+          description: 'Start of time range (ISO string or ms since epoch)',
+        },
+        endTime: {
+          type: 'string',
+          description: 'End of time range (ISO string or ms since epoch)',
+        },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'delete_history',
+    description: `Delete browser history entries. Can delete a specific URL, a time range, or all history.
+
+Provide exactly ONE of: url, startTime+endTime, or all:true.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        url: {
+          type: 'string',
+          description: 'Delete history for this specific URL',
+        },
+        startTime: {
+          type: 'string',
+          description: 'Start of time range to delete (ISO string or ms since epoch). Requires endTime.',
+        },
+        endTime: {
+          type: 'string',
+          description: 'End of time range to delete (ISO string or ms since epoch). Requires startTime.',
+        },
+        all: {
+          type: 'boolean',
+          description: 'Set to true to delete ALL history',
+        },
+      },
+    },
+  },
+
+  // ============================================================================
   // SCRIPT EXECUTION
   // ============================================================================
   {
@@ -1217,6 +1347,10 @@ function isHighRiskTool(name) {
     'press_key',
     'select_option',
     'set_checkbox',
+    'clear_browsing_data',
+    'clear_indexeddb',
+    'clear_cache_storage',
+    'delete_history',
   ];
   return highRisk.includes(name);
 }
