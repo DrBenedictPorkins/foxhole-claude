@@ -27,7 +27,7 @@ git clone https://github.com/DrBenedictPorkins/foxhole-claude.git
 
 Requires your own [Anthropic API key](https://console.anthropic.com/).
 
-## Tools (63)
+## Tools (70)
 
 | Category | Tools |
 |----------|-------|
@@ -39,6 +39,7 @@ Requires your own [Anthropic API key](https://console.anthropic.com/).
 | Output | `create_markdown` `create_html` `open_download` |
 | Cookies | `get_cookies` `set_cookie` `delete_cookie` |
 | Storage | `get_local_storage` `get_session_storage` `set_storage_item` `clear_storage` |
+| Browsing Data | `clear_browsing_data` `list_indexeddb` `clear_indexeddb` `list_cache_storage` `clear_cache_storage` `search_history` `delete_history` |
 | Script | `execute_script` |
 | Wait | `wait_for_element` `wait_for_navigation` `wait` |
 | Network | `get_network_requests` `clear_network_requests` `get_network_request_detail` `set_request_headers` `block_urls` |

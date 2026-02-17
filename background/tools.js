@@ -1315,6 +1315,99 @@ Each item includes a "parent" field with the containing element's text - use thi
     },
   },
 
+  // ============================================================================
+  // DEVELOPER TOOLS
+  // ============================================================================
+  {
+    name: 'detect_page_tech',
+    description: `Detect frameworks, libraries, and technologies used on the current page.
+
+Checks for: React, Next.js, Vue, Nuxt, Angular, Svelte, SvelteKit, Ember, jQuery, Backbone, state management (Redux, MobX, Vuex, Pinia, Zustand, Recoil, Jotai, XState), UI frameworks (Tailwind, Bootstrap, Material UI, Chakra, Ant Design, Radix), build tools (Webpack, Vite, Parcel, Turbopack), analytics (GA, GTM, Segment, Hotjar, Mixpanel), and more.
+
+USE INSTEAD OF manual framework probing with execute_script.`,
+    input_schema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'get_performance_metrics',
+    description: `Get page performance metrics: navigation timing, Core Web Vitals (LCP, FCP, CLS, INP), slowest resources with per-resource timing breakdown (DNS, TCP, TTFB, download), long tasks, memory usage, and custom performance marks/measures.
+
+Returns structured data — no manual scripting needed.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        includeResources: {
+          type: 'boolean',
+          description: 'Include top 10 slowest resources with timing breakdown (default: true)',
+        },
+      },
+    },
+  },
+  {
+    name: 'audit_accessibility',
+    description: `Run 10 WCAG accessibility checks on the current page:
+
+1. Images missing alt text
+2. Form inputs without labels
+3. Missing document lang attribute
+4. Empty links (no text/aria-label)
+5. Empty buttons (no text/aria-label)
+6. Heading hierarchy issues (skipped levels)
+7. Low color contrast (AA ratio check on text elements)
+8. Missing ARIA landmarks
+9. Positive tabindex values (disrupts tab order)
+10. Duplicate element IDs
+
+Returns structured issues with selectors and descriptions.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        maxIssues: {
+          type: 'number',
+          description: 'Maximum issues to return per check category (default: 20)',
+        },
+      },
+    },
+  },
+  {
+    name: 'inspect_app_state',
+    description: `Read application state from React, Redux, Vue, Vuex, Pinia, Angular, or window globals.
+
+Targets:
+- "auto" — detect framework and return whatever state is found
+- "react" — walk React fiber tree from selector to get props/state
+- "redux" — read Redux store via window.__REDUX_DEVTOOLS_EXTENSION__ or store.getState()
+- "vue" — read Vue component data/props from selector
+- "angular" — read Angular component properties from selector
+- "global" — read arbitrary window property by path (e.g., "myApp.config.apiUrl")
+
+Output is safely serialized with depth limits to prevent payload explosions.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        target: {
+          type: 'string',
+          enum: ['auto', 'redux', 'react', 'vue', 'angular', 'global'],
+          description: 'What state to inspect (default: "auto")',
+        },
+        selector: {
+          type: 'string',
+          description: 'CSS selector for the component to inspect (for react/vue/angular targets)',
+        },
+        path: {
+          type: 'string',
+          description: 'Dot-separated path to a specific property (e.g., "user.profile.name" for Redux, "document.title" for global)',
+        },
+        maxDepth: {
+          type: 'number',
+          description: 'Maximum depth for state serialization (default: 3, max: 6)',
+        },
+      },
+    },
+  },
+
 ];
 
 /**

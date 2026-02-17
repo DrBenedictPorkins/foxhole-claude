@@ -104,11 +104,7 @@ Specs go stale — sites get redesigned, selectors change, APIs evolve. Pay atte
 When no site profile or specs exist for the current domain:
 
 1. **Check API observer data** — If API patterns appear in the dynamic context above, the site has callable endpoints. Note the base URL and key endpoints.
-2. **Probe the DOM** — Run a quick `execute_script` to detect the framework:
-   - `window.__NEXT_DATA__` → Next.js
-   - `document.querySelector('[data-reactroot], [id="__next"], [id="root"]')` → React SPA
-   - `window.__NUXT__` → Nuxt/Vue
-   - `document.querySelector('[ng-app], [data-ng-app]')` → Angular
+2. **Detect the tech stack** — Use `detect_page_tech` (one call, no scripting needed) to identify frameworks, state management, UI libraries, build tools, and analytics.
 3. **Determine mode** — React/Vue/Angular SPAs with client-side state are usually UI-ONLY for state changes. Static sites or server-rendered pages with REST APIs are usually API mode.
 4. **Check for blockers** — Look for age gates, login walls, cookie consent dialogs, or other overlays that block interaction. If found, ask the user to complete them rather than trying to automate past them — you are an assistant, not a QA bot.
 5. **Save a profile** — After your first successful interaction, save a `profile` spec capturing the mode and key constraints learned.
