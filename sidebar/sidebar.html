@@ -113,6 +113,9 @@
           <button class="prompt-btn" data-prompt="Run a developer audit on this page. Detect the tech stack (frameworks, state management, UI libraries, build tools, analytics), check Core Web Vitals and performance metrics, and run a WCAG accessibility audit. Summarize all findings with actionable issues.">
             🔬 Dev Audit
           </button>
+          <button class="prompt-btn" data-prompt="Reverse-engineer this page — stay in this tab, don't open new tabs or navigate away. Use detect_page_tech for the stack, get_network_requests (limit: 3 most interesting endpoints) to read already-captured API traffic (don't fetch endpoints yourself), and inspect_app_state to read live component/store data. Present only top 3 findings per category — no long lists. Cross-reference: which DOM sections map to which API responses, what state drives the UI, what's API-drivable vs UI-only. Save a site profile and the most useful specs.">
+            🧬 Deep Recon
+          </button>
         </div>
       </div>
     </div>
