@@ -513,6 +513,22 @@ async function executeTool(toolName, toolInput) {
       case 'clear_user_selections':
         return await sendToContentScript(tabId, 'clear_user_selections', toolInput);
 
+      // Browsing Data & Advanced Storage
+      case 'list_indexeddb':
+      case 'clear_indexeddb':
+      case 'list_cache_storage':
+      case 'clear_cache_storage':
+        return await sendToContentScript(tabId, toolName, toolInput);
+
+      case 'clear_browsing_data':
+        return await handleClearBrowsingData(toolInput);
+
+      case 'search_history':
+        return await handleSearchHistory(toolInput);
+
+      case 'delete_history':
+        return await handleDeleteHistory(toolInput);
+
       default:
         throw new Error(`Unknown tool: ${toolName}`);
     }
@@ -1818,6 +1834,126 @@ async function handleClearMarkedElements(tabId, params) {
   } catch (error) {
     return { error: error.message };
   }
+}
+
+// ==========================================================================
+// Browsing Data Handler
+// ==========================================================================
+
+async function handleClearBrowsingData(params) {
+  const { dataTypes, since, originTypes } = params;
+
+  if (!dataTypes || !Array.isArray(dataTypes) || dataTypes.length === 0) {
+    throw new Error('dataTypes array is required and must not be empty');
+  }
+
+  // Map friendly names to browsingData API options
+  const dataTypesMap = {
+    cache: 'cache',
+    cookies: 'cookies',
+    history: 'history',
+    formData: 'formData',
+    downloads: 'downloads',
+    serviceWorkers: 'serviceWorkers',
+    localStorage: 'localStorage',
+  };
+
+  const removalOptions = {};
+  for (const dt of dataTypes) {
+    const apiKey = dataTypesMap[dt];
+    if (!apiKey) {
+      throw new Error(`Unknown data type: ${dt}. Valid types: ${Object.keys(dataTypesMap).join(', ')}`);
+    }
+    removalOptions[apiKey] = true;
+  }
+
+  const options = {};
+  if (since) {
+    // Convert minutes ago to epoch ms
+    options.since = Date.now() - (since * 60 * 1000);
+  }
+  if (originTypes) {
+    options.originTypes = { [originTypes]: true };
+  }
+
+  await browser.browsingData.remove(options, removalOptions);
+
+  return {
+    cleared: dataTypes,
+    since: since ? `last ${since} minutes` : 'all time',
+    originTypes: originTypes || 'all'
+  };
+}
+
+// ==========================================================================
+// Search History Handler
+// ==========================================================================
+
+async function handleSearchHistory(params) {
+  const { query, maxResults = 25, startTime, endTime } = params;
+
+  if (!query && query !== '') {
+    throw new Error('query is required');
+  }
+
+  const searchParams = {
+    text: query,
+    maxResults: Math.min(maxResults, 100),
+  };
+
+  if (startTime) {
+    const ts = typeof startTime === 'string' ? new Date(startTime).getTime() : Number(startTime);
+    if (!isNaN(ts)) searchParams.startTime = ts;
+  }
+  if (endTime) {
+    const ts = typeof endTime === 'string' ? new Date(endTime).getTime() : Number(endTime);
+    if (!isNaN(ts)) searchParams.endTime = ts;
+  }
+
+  const results = await browser.history.search(searchParams);
+
+  return {
+    results: results.map(item => ({
+      url: item.url,
+      title: item.title,
+      visitCount: item.visitCount,
+      lastVisitTime: item.lastVisitTime ? new Date(item.lastVisitTime).toISOString() : null,
+    })),
+    query,
+    total: results.length,
+  };
+}
+
+// ==========================================================================
+// Delete History Handler
+// ==========================================================================
+
+async function handleDeleteHistory(params) {
+  const { url, startTime, endTime, all } = params;
+
+  if (all) {
+    await browser.history.deleteAll();
+    return { message: 'All history deleted' };
+  }
+
+  if (url) {
+    await browser.history.deleteUrl({ url });
+    return { message: `History deleted for URL: ${url}` };
+  }
+
+  if (startTime && endTime) {
+    const start = typeof startTime === 'string' ? new Date(startTime).getTime() : Number(startTime);
+    const end = typeof endTime === 'string' ? new Date(endTime).getTime() : Number(endTime);
+
+    if (isNaN(start) || isNaN(end)) {
+      throw new Error('Invalid startTime or endTime');
+    }
+
+    await browser.history.deleteRange({ startTime: start, endTime: end });
+    return { message: `History deleted for range: ${new Date(start).toISOString()} to ${new Date(end).toISOString()}` };
+  }
+
+  throw new Error('Provide one of: url, startTime+endTime, or all:true');
 }
 
 // ==========================================================================

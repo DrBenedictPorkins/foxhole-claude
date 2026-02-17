@@ -607,6 +607,16 @@
       case 'clear_user_selections':
         return clearUserSelections();
 
+      // IndexedDB and Cache Storage
+      case 'list_indexeddb':
+        return await handleListIndexedDB(params);
+      case 'clear_indexeddb':
+        return await handleClearIndexedDB(params);
+      case 'list_cache_storage':
+        return await handleListCacheStorage(params);
+      case 'clear_cache_storage':
+        return await handleClearCacheStorage(params);
+
       default:
         throw new Error(`Unknown action: ${action}`);
     }
@@ -1136,6 +1146,112 @@
     }
 
     return { success: true, filled: true, fieldCount: Object.keys(fields).length, results };
+  }
+
+  // ==========================================================================
+  // IndexedDB Handlers
+  // ==========================================================================
+
+  async function handleListIndexedDB() {
+    try {
+      // indexedDB.databases() is available in Firefox 126+
+      if (typeof indexedDB.databases === 'function') {
+        const dbs = await indexedDB.databases();
+        return {
+          databases: dbs.map(db => ({ name: db.name, version: db.version }))
+        };
+      }
+      // Fallback: can't enumerate without databases() API
+      return {
+        databases: [],
+        note: 'indexedDB.databases() not available in this Firefox version (requires 126+). Use execute_script to probe specific database names.'
+      };
+    } catch (e) {
+      return { error: e.message };
+    }
+  }
+
+  async function handleClearIndexedDB(params) {
+    const { name } = params;
+    const deleted = [];
+
+    try {
+      if (name) {
+        // Delete a specific database
+        await new Promise((resolve, reject) => {
+          const req = indexedDB.deleteDatabase(name);
+          req.onsuccess = () => resolve();
+          req.onerror = () => reject(new Error(`Failed to delete database: ${name}`));
+          req.onblocked = () => resolve(); // Still counts as deleted
+        });
+        deleted.push(name);
+      } else {
+        // Delete all databases
+        if (typeof indexedDB.databases !== 'function') {
+          return { error: 'indexedDB.databases() not available. Provide a specific database name to delete.' };
+        }
+        const dbs = await indexedDB.databases();
+        for (const db of dbs) {
+          try {
+            await new Promise((resolve, reject) => {
+              const req = indexedDB.deleteDatabase(db.name);
+              req.onsuccess = () => resolve();
+              req.onerror = () => reject(new Error(`Failed to delete: ${db.name}`));
+              req.onblocked = () => resolve();
+            });
+            deleted.push(db.name);
+          } catch (e) {
+            // Continue deleting others even if one fails
+            console.warn(`[ClearIndexedDB] Failed to delete ${db.name}:`, e);
+          }
+        }
+      }
+      return { deleted };
+    } catch (e) {
+      return { error: e.message, deleted };
+    }
+  }
+
+  // ==========================================================================
+  // Cache Storage Handlers
+  // ==========================================================================
+
+  async function handleListCacheStorage() {
+    try {
+      if (!('caches' in window)) {
+        return { caches: [], note: 'Cache Storage API not available on this page' };
+      }
+      const names = await caches.keys();
+      return { caches: names };
+    } catch (e) {
+      return { error: e.message };
+    }
+  }
+
+  async function handleClearCacheStorage(params) {
+    const { name } = params;
+    const deleted = [];
+
+    try {
+      if (!('caches' in window)) {
+        return { error: 'Cache Storage API not available on this page' };
+      }
+
+      if (name) {
+        const result = await caches.delete(name);
+        if (result) deleted.push(name);
+        else return { error: `Cache "${name}" not found` };
+      } else {
+        const names = await caches.keys();
+        for (const cacheName of names) {
+          const result = await caches.delete(cacheName);
+          if (result) deleted.push(cacheName);
+        }
+      }
+      return { deleted };
+    } catch (e) {
+      return { error: e.message, deleted };
+    }
   }
 
   // ==========================================================================
