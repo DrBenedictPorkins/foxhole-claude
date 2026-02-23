@@ -297,7 +297,7 @@ function createViewAsHtmlButton(markdownContent, filename) {
   htmlBtn.addEventListener('click', async (e) => {
     e.stopPropagation();
 
-    // State 2: already downloaded — act as Open button
+    // State 2: already downloaded — re-open the saved file
     if (htmlBtn.dataset.downloadId) {
       const downloadId = parseInt(htmlBtn.dataset.downloadId);
       try {
@@ -306,7 +306,7 @@ function createViewAsHtmlButton(markdownContent, filename) {
         await browser.downloads.open(downloadId);
         htmlBtn.textContent = '✓ Opened';
         setTimeout(() => {
-          htmlBtn.innerHTML = '📄 Open HTML';
+          htmlBtn.innerHTML = '🌐 View as HTML';
           htmlBtn.disabled = false;
         }, 1500);
       } catch (err) {
@@ -314,14 +314,14 @@ function createViewAsHtmlButton(markdownContent, filename) {
           await browser.downloads.show(downloadId);
           htmlBtn.textContent = '✓ In Finder';
           setTimeout(() => {
-            htmlBtn.innerHTML = '📄 Open HTML';
+            htmlBtn.innerHTML = '🌐 View as HTML';
             htmlBtn.disabled = false;
           }, 1500);
         } catch (showErr) {
           htmlBtn.textContent = '✗ Failed';
           htmlBtn.style.background = '#f87171';
           setTimeout(() => {
-            htmlBtn.innerHTML = '📄 Open HTML';
+            htmlBtn.innerHTML = '🌐 View as HTML';
             htmlBtn.style.background = '#4a7c59';
             htmlBtn.disabled = false;
           }, 2000);
@@ -356,43 +356,7 @@ function createViewAsHtmlButton(markdownContent, filename) {
       }
 
       const title = filename ? filename.replace(/\.md$/i, '') : 'Claude Report';
-      const fullHtml = `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${title}</title>
-<style>
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 40px 20px;
-  background: #1a1a1a;
-  color: #e0e0e0;
-  line-height: 1.6;
-}
-h1, h2, h3, h4 { color: #fff; margin-top: 1.5em; }
-h1 { border-bottom: 2px solid #444; padding-bottom: 0.5em; }
-h2 { border-bottom: 1px solid #333; padding-bottom: 0.3em; }
-table { border-collapse: collapse; width: 100%; margin: 20px 0; }
-th, td { border: 1px solid #444; padding: 12px; text-align: left; }
-th { background: #333; color: #fff; }
-tr:nth-child(even) { background: #252525; }
-code { background: #333; padding: 2px 6px; border-radius: 3px; font-family: 'SF Mono', Monaco, monospace; }
-pre { background: #2d2d2d; padding: 16px; border-radius: 8px; overflow-x: auto; border: 1px solid #444; }
-pre code { background: none; padding: 0; }
-a { color: #6db3f2; }
-blockquote { border-left: 4px solid #444; margin: 1em 0; padding-left: 1em; color: #aaa; }
-ul, ol { padding-left: 2em; }
-li { margin: 0.5em 0; }
-hr { border: none; border-top: 1px solid #444; margin: 2em 0; }
-</style>
-</head>
-<body>
-${htmlContent}
-</body>
-</html>`;
+      const fullHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>${title}</title><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:900px;margin:0 auto;padding:40px 20px;background:#1a1a1a;color:#e0e0e0;line-height:1.6}h1,h2,h3,h4{color:#fff;margin-top:1.5em}h1{border-bottom:2px solid #444;padding-bottom:.5em}h2{border-bottom:1px solid #333;padding-bottom:.3em}table{border-collapse:collapse;width:100%;margin:20px 0}th,td{border:1px solid #444;padding:12px;text-align:left}th{background:#333;color:#fff}tr:nth-child(even){background:#252525}code{background:#333;padding:2px 6px;border-radius:3px;font-family:'SF Mono',Monaco,monospace}pre{background:#2d2d2d;padding:16px;border-radius:8px;overflow-x:auto;border:1px solid #444}pre code{background:none;padding:0}a{color:#6db3f2}blockquote{border-left:4px solid #444;margin:1em 0;padding-left:1em;color:#aaa}ul,ol{padding-left:2em}li{margin:.5em 0}hr{border:none;border-top:1px solid #444;margin:2em 0}</style></head><body>${htmlContent}</body></html>`;
 
       const htmlFilename = filename ? filename.replace(/\.md$/i, '.html') : 'claude-report.html';
       const blob = new Blob([fullHtml], { type: 'text/html' });
@@ -406,13 +370,24 @@ ${htmlContent}
 
       URL.revokeObjectURL(blobUrl);
 
-      // Transform to State 2: "Open HTML" button
+      // Auto-open the saved file
+      htmlBtn.textContent = 'Opening...';
+      try {
+        await browser.downloads.open(downloadId);
+      } catch (err) {
+        await browser.downloads.show(downloadId);
+      }
+
+      // Transform to State 2: same label, but subsequent clicks just re-open
       htmlBtn.className = 'open-file-btn';
       htmlBtn.dataset.downloadId = String(downloadId);
-      htmlBtn.dataset.label = '📄 Open HTML';
+      htmlBtn.dataset.label = '🌐 View as HTML';
       delete htmlBtn.dataset.markdownContent;
-      htmlBtn.innerHTML = '📄 Open HTML';
-      htmlBtn.disabled = false;
+      htmlBtn.textContent = '✓ Opened';
+      setTimeout(() => {
+        htmlBtn.innerHTML = '🌐 View as HTML';
+        htmlBtn.disabled = false;
+      }, 1500);
 
     } catch (err) {
       console.error('HTML download failed:', err);
