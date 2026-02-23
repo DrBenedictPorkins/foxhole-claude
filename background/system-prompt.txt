@@ -88,7 +88,7 @@ Specs go stale — sites get redesigned, selectors change, APIs evolve. Pay atte
 
 **When a spec fails** (selector not found, endpoint 404, workflow broken):
 1. Do NOT work around it — the stale spec will mislead future sessions too
-2. Delete it with `delete_site_spec` (spec_id is shown in the spec listing)
+2. Delete it with `delete_site_spec` (spec_id is the `#xxxx` at the end of the spec heading)
 3. Discover the new approach
 4. Save a corrected spec with `save_site_spec`
 

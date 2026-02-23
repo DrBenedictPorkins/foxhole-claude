@@ -405,28 +405,39 @@ function reattachChatEventListeners(chatContainer, callbacks) {
     const resetLabel = btn.dataset.label || '📄 Open';
     const newBtn = btn.cloneNode(true);
     btn.parentNode.replaceChild(newBtn, btn);
+    // Reset any transient state (button may have been serialized mid-click)
+    newBtn.innerHTML = resetLabel;
+    newBtn.disabled = false;
+    newBtn.style.background = '';
+    const fileUrl = newBtn.dataset.fileUrl;
     newBtn.addEventListener('click', async (e) => {
       e.stopPropagation();
       try {
         newBtn.textContent = 'Opening...';
         newBtn.disabled = true;
-        await browser.downloads.open(downloadId);
+        if (fileUrl) {
+          await browser.tabs.create({ url: fileUrl });
+        } else {
+          await browser.downloads.open(downloadId);
+        }
         newBtn.textContent = '✓ Opened';
         setTimeout(() => { newBtn.innerHTML = resetLabel; newBtn.disabled = false; }, 1500);
       } catch (err) {
-        try {
-          await browser.downloads.show(downloadId);
-          newBtn.textContent = '✓ In Finder';
-          setTimeout(() => { newBtn.innerHTML = resetLabel; newBtn.disabled = false; }, 1500);
-        } catch (showErr) {
-          newBtn.textContent = '✗ Failed';
-          newBtn.style.background = '#f87171';
-          setTimeout(() => {
-            newBtn.innerHTML = resetLabel;
-            newBtn.style.background = '';
-            newBtn.disabled = false;
-          }, 2000);
+        if (!fileUrl) {
+          try {
+            await browser.downloads.show(downloadId);
+            newBtn.textContent = '✓ In Finder';
+            setTimeout(() => { newBtn.innerHTML = resetLabel; newBtn.disabled = false; }, 1500);
+            return;
+          } catch (showErr) { /* fall through */ }
         }
+        newBtn.textContent = '✗ Failed';
+        newBtn.style.background = '#f87171';
+        setTimeout(() => {
+          newBtn.innerHTML = resetLabel;
+          newBtn.style.background = '';
+          newBtn.disabled = false;
+        }, 2000);
       }
     });
   });
@@ -437,6 +448,8 @@ function reattachChatEventListeners(chatContainer, callbacks) {
     const filePath = btn.dataset.filePath;
     const newBtn = btn.cloneNode(true);
     btn.parentNode.replaceChild(newBtn, btn);
+    newBtn.innerHTML = '📋 Copy URL';
+    newBtn.style.background = '';
     newBtn.addEventListener('click', async (e) => {
       e.stopPropagation();
       const url = fileUrl || `file://${filePath}`;

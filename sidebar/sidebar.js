@@ -47,6 +47,9 @@
   /** @type {Array} Tool names used during current streaming response (for conversation history) */
   let currentStreamingTools = [];
 
+  /** @type {boolean} Whether the current message was sent via the report prompt button */
+  let reportPromptPending = false;
+
   /** @type {Object|null} Thinking timer state */
   let thinkingTimer = null;
 
@@ -80,6 +83,7 @@
   // imagePreview and removeImageBtn are now created dynamically per-image in renderImagePreviews()
   const settingsMenuBtn = document.getElementById('settings-menu-btn');
   const exportContextBtn = document.getElementById('export-context-btn');
+  const reportPromptBtn = document.getElementById('report-prompt-btn');
 
   // Modal Elements
   const confirmModal = document.getElementById('confirm-modal');
@@ -225,6 +229,9 @@
 
     setupEventListeners();
     setupInputAutoResize();
+
+    // Save state when sidebar is closed
+    window.addEventListener('pagehide', () => { persistSidebarState(); });
   }
 
   // ============================================================================
@@ -233,17 +240,32 @@
 
   async function initTabTracking() {
     try {
+      // Restore persisted state from previous sidebar session
+      const data = await browser.storage.local.get('foxhole_sidebar_state');
+      const persisted = data.foxhole_sidebar_state;
+      if (persisted) {
+        const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+        for (const [tabId, tabState] of Object.entries(persisted)) {
+          if (!tabState.savedAt || tabState.savedAt > cutoff) {
+            tabConversations.set(parseInt(tabId), tabState);
+          }
+        }
+      }
+
       const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
       if (tab) {
         currentTabId = tab.id;
         currentWindowId = tab.windowId;
-        tabConversations.set(currentTabId, {
-          conversation: [],
-          tokenUsage: { input: 0, output: 0, cacheCreation: 0, cacheRead: 0 },
-          lastTurnTokens: { input: 0, output: 0, cacheCreation: 0, cacheRead: 0 },
-          chatHtml: null,
-          autonomyMode: autonomyMode
-        });
+        if (!tabConversations.has(currentTabId)) {
+          tabConversations.set(currentTabId, {
+            conversation: [],
+            tokenUsage: { input: 0, output: 0, cacheCreation: 0, cacheRead: 0 },
+            lastTurnTokens: { input: 0, output: 0, cacheCreation: 0, cacheRead: 0 },
+            chatHtml: null,
+            autonomyMode: autonomyMode
+          });
+        }
+        loadTabState(currentTabId);
         console.log(`[Sidebar] Initialized for window ${currentWindowId}, tab ${currentTabId}`);
         updateTabInfo();
         updateApiIndicator();
@@ -303,6 +325,36 @@
     });
   }
 
+  async function persistSidebarState() {
+    saveCurrentTabState();
+    const toSave = {};
+    for (const [tabId, tabState] of tabConversations) {
+      // Strip base64 image src attrs (screenshots) to keep storage size manageable
+      const chatHtml = tabState.chatHtml
+        ? tabState.chatHtml.replace(/src="data:[^"]+"/g, 'src=""')
+        : null;
+      // Strip image content blocks from conversation
+      const conv = tabState.conversation.map(msg => {
+        if (!Array.isArray(msg.content)) return msg;
+        return { ...msg, content: msg.content.filter(b => b.type !== 'image') };
+      });
+      toSave[tabId] = {
+        conversation: conv,
+        tokenUsage: tabState.tokenUsage,
+        lastTurnTokens: tabState.lastTurnTokens,
+        chatHtml,
+        scrollTop: tabState.scrollTop,
+        autonomyMode: tabState.autonomyMode,
+        savedAt: Date.now()
+      };
+    }
+    try {
+      await browser.storage.local.set({ foxhole_sidebar_state: toSave });
+    } catch (err) {
+      console.error('[Persist] Failed to save sidebar state:', err);
+    }
+  }
+
   function loadTabState(tabId) {
     const savedState = tabConversations.get(tabId);
 
@@ -350,6 +402,7 @@
 
     refreshTokenDisplay();
     handleInputChange();
+    reportPromptBtn.classList.add('hidden');
     window.ModalManager.autonomy.updateUI();
   }
 
@@ -473,6 +526,17 @@
       exportContext();
     });
 
+    // Report prompt button
+    reportPromptBtn.addEventListener('click', () => {
+      userInput.value = 'Generate report based on your findings';
+      userInput.style.height = 'auto';
+      userInput.style.height = Math.min(userInput.scrollHeight, 120) + 'px';
+      userInput.focus();
+      reportPromptBtn.classList.add('hidden');
+      reportPromptPending = true;
+      handleInputChange();
+    });
+
     // Stop button
     stopBtn.addEventListener('click', handleStopGeneration);
 
@@ -590,6 +654,7 @@
     const hasText = userInput.value.trim().length > 0;
     const hasImages = pendingImages.length > 0;
     sendBtn.disabled = (!hasText && !hasImages) || isStreaming;
+    if (userInput.value.length > 0) reportPromptBtn.classList.add('hidden');
   }
 
   async function handleSendMessage() {
@@ -646,6 +711,7 @@
     isStreaming = true;
     streamingTabId = currentTabId;
     currentStreamingTools = []; // Reset tool tracking for new response
+    reportPromptBtn.classList.add('hidden');
     sendBtn.classList.add('hidden');
     stopBtn.classList.remove('hidden');
 
@@ -744,7 +810,9 @@
       return;
     }
 
-    console.log('[Sidebar] Received message:', message.type, message);
+    if (message.type !== 'STREAM_DELTA') {
+      console.log('[Sidebar] Received message:', message.type, message);
+    }
 
     switch (message.type) {
       case 'STREAM_DELTA':
@@ -999,7 +1067,14 @@
 
     // Handle pending tab switch
     const tabToSwitchTo = pendingTabSwitch;
+    const hadTools = currentStreamingTools.length > 0;
+    const wasReportPrompt = reportPromptPending;
+    reportPromptPending = false;
     resetStreamingState();
+
+    if (hadTools && !wasReportPrompt) {
+      reportPromptBtn.classList.remove('hidden');
+    }
 
     if (tabToSwitchTo && tabToSwitchTo !== currentTabId) {
       console.log('[TabSwitch] Streaming complete, switching to pending tab', tabToSwitchTo);
@@ -1010,6 +1085,9 @@
       updateTabInfo();
       updateApiIndicator();
     }
+
+    // Persist state after each completed response
+    persistSidebarState();
 
     // Check if context compression is needed
     checkAndCompressContext();

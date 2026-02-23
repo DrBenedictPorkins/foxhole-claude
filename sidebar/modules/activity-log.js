@@ -297,35 +297,30 @@ function createViewAsHtmlButton(markdownContent, filename) {
   htmlBtn.addEventListener('click', async (e) => {
     e.stopPropagation();
 
-    // State 2: already downloaded — re-open the saved file
+    // State 2: already downloaded — re-open in Firefox tab
     if (htmlBtn.dataset.downloadId) {
-      const downloadId = parseInt(htmlBtn.dataset.downloadId);
+      const fileUrl = htmlBtn.dataset.fileUrl;
       try {
         htmlBtn.textContent = 'Opening...';
         htmlBtn.disabled = true;
-        await browser.downloads.open(downloadId);
+        if (fileUrl) {
+          await browser.tabs.create({ url: fileUrl });
+        } else {
+          await browser.downloads.open(parseInt(htmlBtn.dataset.downloadId));
+        }
         htmlBtn.textContent = '✓ Opened';
         setTimeout(() => {
           htmlBtn.innerHTML = '🌐 View as HTML';
           htmlBtn.disabled = false;
         }, 1500);
       } catch (err) {
-        try {
-          await browser.downloads.show(downloadId);
-          htmlBtn.textContent = '✓ In Finder';
-          setTimeout(() => {
-            htmlBtn.innerHTML = '🌐 View as HTML';
-            htmlBtn.disabled = false;
-          }, 1500);
-        } catch (showErr) {
-          htmlBtn.textContent = '✗ Failed';
-          htmlBtn.style.background = '#f87171';
-          setTimeout(() => {
-            htmlBtn.innerHTML = '🌐 View as HTML';
-            htmlBtn.style.background = '#4a7c59';
-            htmlBtn.disabled = false;
-          }, 2000);
-        }
+        htmlBtn.textContent = '✗ Failed';
+        htmlBtn.style.background = '#f87171';
+        setTimeout(() => {
+          htmlBtn.innerHTML = '🌐 View as HTML';
+          htmlBtn.style.background = '#4a7c59';
+          htmlBtn.disabled = false;
+        }, 2000);
       }
       return;
     }
@@ -389,18 +384,27 @@ function createViewAsHtmlButton(markdownContent, filename) {
 
       URL.revokeObjectURL(blobUrl);
 
-      // Auto-open the saved file
+      // Get the file:// path and open in Firefox tab
+      const [downloadInfo] = await browser.downloads.search({ id: downloadId });
+      const filePath = downloadInfo?.filename;
+      const fileUrl = filePath ? `file://${filePath}` : null;
+
       htmlBtn.textContent = 'Opening...';
-      try {
-        await browser.downloads.open(downloadId);
-      } catch (err) {
-        await browser.downloads.show(downloadId);
+      if (fileUrl) {
+        await browser.tabs.create({ url: fileUrl });
+      } else {
+        try {
+          await browser.downloads.open(downloadId);
+        } catch (openErr) {
+          await browser.downloads.show(downloadId);
+        }
       }
 
-      // Transform to State 2: same label, but subsequent clicks just re-open
+      // Transform to State 2: subsequent clicks re-open the same file
       htmlBtn.className = 'open-file-btn';
       htmlBtn.dataset.downloadId = String(downloadId);
       htmlBtn.dataset.label = '🌐 View as HTML';
+      htmlBtn.dataset.fileUrl = fileUrl || '';
       delete htmlBtn.dataset.markdownContent;
       htmlBtn.textContent = '✓ Opened';
       setTimeout(() => {
