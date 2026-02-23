@@ -250,8 +250,53 @@ function loadTabState(tabId, state, callbacks, elements) {
 }
 
 /**
- * Gets the welcome message HTML content.
- * Returns the initial welcome screen shown to users on new tabs.
+ * Preset prompts — single source of truth for welcome screen + hamburger menu.
+ * Items with menuOnly:true appear only in the hamburger dropdown, not on the welcome screen.
+ * Items with divider:true render as visual separators.
+ */
+const PRESET_PROMPTS = [
+  { icon: null, label: 'Analyze Page', prompt: "What's on this page? Give me a quick summary.", menuOnly: true },
+  { icon: null, label: 'Visual Selection', prompt: 'Let me select some items on this page visually.', menuOnly: true },
+  { divider: true },
+  { icon: '🔍', label: 'Record API Traffic', prompt: 'Monitor network traffic as I browse this site. Summarize API endpoints, methods, and request patterns. For large payloads, just note the structure - don\'t dump raw data. I want to understand how to replicate this site\'s functionality programmatically.' },
+  { icon: '📋', label: 'Document APIs', prompt: 'Analyze the network calls captured so far. Document the internal APIs: list endpoints, auth headers, request formats, and response structures. Create a quick reference I can use to call these APIs directly.' },
+  { icon: '🗺️', label: 'Map DOM Structure', prompt: "Analyze this page's DOM structure and document the key selectors for: navigation, search, product/item listings, forms, and interactive elements. Save as site specs for future reference." },
+  { divider: true },
+  { icon: '🛡️', label: 'Security Audit', prompt: 'Audit this page for privacy and security issues. Check for: third-party trackers and analytics scripts, dark patterns (hidden opt-ins, misleading buttons, forced consent), exposed data in the DOM or network requests, insecure form actions, and suspicious external resource loading. Summarize findings by severity.' },
+  { icon: '🧲', label: 'Extract Content', prompt: "Extract content from this page. Scan the DOM to see what's here, then ask me what I want to keep (e.g., just posts, just products, just articles). Once I tell you, extract that content and replace the page with a clean version — no ads, no trackers, no clutter." },
+  { divider: true },
+  { icon: '🔬', label: 'Dev Audit', prompt: 'Run a developer audit on this page. Detect the tech stack (frameworks, state management, UI libraries, build tools, analytics), check Core Web Vitals and performance metrics, and run a WCAG accessibility audit. Summarize all findings with actionable issues.' },
+  { icon: '🧬', label: 'Deep Recon', prompt: 'Stay in this tab. No new tabs, no navigation, no fetching endpoints. Run detect_page_tech, read get_network_requests for already-captured traffic, and inspect_app_state for live data. Top 3 per category max. Map: which DOM sections use which APIs, what state drives the UI, what\'s API-callable vs UI-only. Save a site profile and key specs.' },
+];
+
+function escapeAttr(s) {
+  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+}
+
+/**
+ * Generate welcome screen prompt buttons (excludes menuOnly items and dividers).
+ */
+function getWelcomePromptsHtml() {
+  return PRESET_PROMPTS
+    .filter(p => !p.divider && !p.menuOnly)
+    .map(p => `<button class="prompt-btn" data-prompt="${escapeAttr(p.prompt)}">${p.icon} ${p.label}</button>`)
+    .join('\n        ');
+}
+
+/**
+ * Generate hamburger dropdown menu items (all items including menuOnly).
+ */
+function getPromptsDropdownHtml() {
+  return PRESET_PROMPTS
+    .map(p => {
+      if (p.divider) return '<div class="prompt-divider"></div>';
+      return `<button class="prompt-item" data-prompt="${escapeAttr(p.prompt)}">${p.label}</button>`;
+    })
+    .join('\n');
+}
+
+/**
+ * Returns the HTML for the welcome message shown when starting a new conversation.
  *
  * @returns {string} HTML string for the welcome message
  */
@@ -272,27 +317,7 @@ function getWelcomeMessageHtml() {
       </ul>
       <p class="welcome-tip">Try these to get started:</p>
       <div class="welcome-prompts">
-        <button class="prompt-btn" data-prompt="Monitor network traffic as I browse this site. Summarize API endpoints, methods, and request patterns. For large payloads, just note the structure - don't dump raw data. I want to understand how to replicate this site's functionality programmatically.">
-          🔍 Record API Traffic
-        </button>
-        <button class="prompt-btn" data-prompt="Analyze the network calls captured so far. Document the internal APIs: list endpoints, auth headers, request formats, and response structures. Create a quick reference I can use to call these APIs directly.">
-          📋 Document APIs
-        </button>
-        <button class="prompt-btn" data-prompt="Analyze this page's DOM structure and document the key selectors for: navigation, search, product/item listings, forms, and interactive elements. Save as site specs for future reference.">
-          🗺️ Map DOM Structure
-        </button>
-        <button class="prompt-btn" data-prompt="Audit this page for privacy and security issues. Check for: third-party trackers and analytics scripts, dark patterns (hidden opt-ins, misleading buttons, forced consent), exposed data in the DOM or network requests, insecure form actions, and suspicious external resource loading. Summarize findings by severity.">
-          🛡️ Security Audit
-        </button>
-        <button class="prompt-btn" data-prompt="Extract content from this page. Scan the DOM to see what's here, then ask me what I want to keep (e.g., just posts, just products, just articles). Once I tell you, extract that content and replace the page with a clean version — no ads, no trackers, no clutter.">
-          🧲 Extract Content
-        </button>
-        <button class="prompt-btn" data-prompt="Run a developer audit on this page. Detect the tech stack (frameworks, state management, UI libraries, build tools, analytics), check Core Web Vitals and performance metrics, and run a WCAG accessibility audit. Summarize all findings with actionable issues.">
-          🔬 Dev Audit
-        </button>
-        <button class="prompt-btn" data-prompt="Reverse-engineer this page — stay in this tab, don't open new tabs or navigate away. Use detect_page_tech for the stack, get_network_requests (limit: 3 most interesting endpoints) to read already-captured API traffic (don't fetch endpoints yourself), and inspect_app_state to read live component/store data. Present only top 3 findings per category — no long lists. Cross-reference: which DOM sections map to which API responses, what state drives the UI, what's API-drivable vs UI-only. Save a site profile and the most useful specs.">
-          🧬 Deep Recon
-        </button>
+        ${getWelcomePromptsHtml()}
       </div>
     </div>
   `;
@@ -387,6 +412,8 @@ if (typeof window !== 'undefined') {
     saveCurrentTabState,
     loadTabState,
     getWelcomeMessageHtml,
+    getWelcomePromptsHtml,
+    getPromptsDropdownHtml,
     attachPromptButtonListeners,
     reattachChatEventListeners,
     createDefaultTokenUsage

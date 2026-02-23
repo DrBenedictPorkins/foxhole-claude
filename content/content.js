@@ -607,6 +607,10 @@
       case 'clear_user_selections':
         return clearUserSelections();
 
+      // Clean text (remove excessive blank lines)
+      case 'clean_text':
+        return handleCleanText(params);
+
       // IndexedDB and Cache Storage
       case 'list_indexeddb':
         return await handleListIndexedDB(params);
@@ -1146,6 +1150,130 @@
     }
 
     return { success: true, filled: true, fieldCount: Object.keys(fields).length, results };
+  }
+
+  // ==========================================================================
+  // Clean Text Handler
+  // ==========================================================================
+
+  /**
+   * Set value on a textarea/input using the native prototype setter.
+   * This bypasses React/Vue/Angular property overrides so the framework
+   * sees the change and syncs it to state (and ultimately to the server).
+   */
+  function setNativeValue(el, value) {
+    const proto = el.tagName === 'TEXTAREA'
+      ? HTMLTextAreaElement.prototype
+      : HTMLInputElement.prototype;
+    const nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+    if (nativeSetter) {
+      nativeSetter.call(el, value);
+    } else {
+      el.value = value;
+    }
+  }
+
+  /**
+   * Fire the full sequence of events that frameworks and autosave handlers
+   * listen for: InputEvent (with inputType for modern handlers), then
+   * change, then blur+focus to trigger on-blur save hooks without
+   * actually losing focus visually.
+   */
+  function fireChangeEvents(el) {
+    // InputEvent with inputType — React 17+, modern frameworks
+    el.dispatchEvent(new InputEvent('input', {
+      bubbles: true,
+      cancelable: true,
+      inputType: 'insertFromPaste' // closest semantic for bulk text replacement
+    }));
+    // change — classic HTML forms, jQuery, Angular.js
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    // blur+focus cycle — triggers onBlur autosave (Notion, Confluence, etc.)
+    el.dispatchEvent(new Event('blur', { bubbles: true }));
+    el.dispatchEvent(new Event('focus', { bubbles: true }));
+  }
+
+  function handleCleanText() {
+    const el = document.activeElement;
+    if (!el) {
+      return { success: false, error: 'No focused element' };
+    }
+
+    // Handle <textarea> and <input> elements
+    if (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && el.type === 'text')) {
+      const start = el.selectionStart;
+      const end = el.selectionEnd;
+      const hasSelection = start !== end;
+
+      let original, cleaned, newValue;
+      if (hasSelection) {
+        original = el.value.substring(start, end);
+        cleaned = original.replace(/\n{3,}/g, '\n\n');
+        newValue = el.value.substring(0, start) + cleaned + el.value.substring(end);
+      } else {
+        original = el.value;
+        cleaned = original.replace(/\n{3,}/g, '\n\n');
+        newValue = cleaned;
+      }
+
+      if (original === cleaned) {
+        return { success: true, cleaned: false, linesRemoved: 0 };
+      }
+
+      // Use native setter so React/Vue detect the change
+      setNativeValue(el, newValue);
+
+      // Restore cursor / selection
+      if (hasSelection) {
+        el.selectionStart = start;
+        el.selectionEnd = start + cleaned.length;
+      }
+
+      fireChangeEvents(el);
+
+      const linesRemoved = original.length - cleaned.length;
+      return { success: true, cleaned: true, linesRemoved };
+    }
+
+    // Handle contentEditable elements (Gmail, Notion, Confluence, etc.)
+    if (el.isContentEditable) {
+      const selection = window.getSelection();
+      const hasSelection = selection && selection.toString().length > 0;
+
+      if (hasSelection) {
+        const selectedText = selection.toString();
+        const cleaned = selectedText.replace(/\n{3,}/g, '\n\n');
+        if (selectedText === cleaned) {
+          return { success: true, cleaned: false, linesRemoved: 0 };
+        }
+        // Use execCommand so the edit enters the undo stack and
+        // rich-text editors (Draft.js, ProseMirror, Tiptap) pick it up
+        document.execCommand('insertText', false, cleaned);
+        fireChangeEvents(el);
+        const linesRemoved = selectedText.length - cleaned.length;
+        return { success: true, cleaned: true, linesRemoved };
+      }
+
+      // No selection — select all content, then replace
+      const original = el.innerText;
+      const cleaned = original.replace(/\n{3,}/g, '\n\n');
+      if (original === cleaned) {
+        return { success: true, cleaned: false, linesRemoved: 0 };
+      }
+
+      // Select all content in the editable, then replace via execCommand
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      document.execCommand('insertText', false, cleaned);
+      fireChangeEvents(el);
+
+      const linesRemoved = original.length - cleaned.length;
+      return { success: true, cleaned: true, linesRemoved };
+    }
+
+    return { success: false, error: 'Focused element is not a text input or contentEditable' };
   }
 
   // ==========================================================================

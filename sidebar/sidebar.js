@@ -516,14 +516,27 @@
     // Update notes badge on load
     specsManager?.updateBadge();
 
+    // Populate welcome screen prompts from single source of truth
+    const welcomePrompts = document.querySelector('.welcome-prompts');
+    if (welcomePrompts) {
+      welcomePrompts.innerHTML = window.TabManager.getWelcomePromptsHtml
+        ? window.TabManager.getWelcomePromptsHtml()
+        : '';
+    }
+
     // Welcome prompt buttons (initial page load)
     window.TabManager.attachPromptButtonListeners(userInput);
 
-    // Prompts dropdown menu
+    // Prompts dropdown menu — populate from single source of truth
     const promptsMenuBtn = document.getElementById('prompts-menu-btn');
     const promptsDropdown = document.getElementById('prompts-dropdown');
 
     if (promptsMenuBtn && promptsDropdown) {
+      // Populate dropdown from PRESET_PROMPTS
+      if (window.TabManager.getPromptsDropdownHtml) {
+        promptsDropdown.innerHTML = window.TabManager.getPromptsDropdownHtml();
+      }
+
       // Toggle dropdown on button click
       promptsMenuBtn.addEventListener('click', (e) => {
         e.stopPropagation();

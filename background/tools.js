@@ -1316,6 +1316,18 @@ Each item includes a "parent" field with the containing element's text - use thi
   },
 
   // ============================================================================
+  // TEXT UTILITIES
+  // ============================================================================
+  {
+    name: 'clean_text',
+    description: 'Clean excessive blank lines in the focused text field or contentEditable element. Collapses 3+ consecutive newlines down to 2. If text is selected, only the selection is cleaned.',
+    input_schema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  // ============================================================================
   // DEVELOPER TOOLS
   // ============================================================================
   {
