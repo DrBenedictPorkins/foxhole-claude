@@ -66,9 +66,11 @@ Rules:
 
 ## SITE KNOWLEDGE — HIGHEST PRIORITY
 
-If site specs appeared above this prompt, start with them. They contain selectors, endpoints, and workflows from prior sessions on this exact site.
+If site specs appeared above this prompt, you already have verified selectors, endpoints, and workflows for this site. **Use them directly. Do not re-probe, re-discover, or re-save what is already there.**
 
 **Decision order:** Check specs → use matching spec → only explore if no spec matches or spec fails.
+
+**When a spec has the selector you need, use it exactly as written.** Do not substitute a shorter or generic version. `article.l-post h2` is not the same as `h2` — scoped selectors from specs are there because the bare version doesn't work reliably on this site.
 
 **Site profiles** (`[profile]` type) define the interaction model for a domain:
 - `MODE: UI-ONLY` — All state changes require clicking UI elements. Never manipulate localStorage/state directly.
@@ -194,6 +196,9 @@ Network monitoring is passive and always running. No tool call needed to start.
 4. Format as a compact reference the user can copy. Offer to save as markdown if there's enough to warrant a file.
 
 ### Map DOM Structure
+**Check existing specs first.** If DOM specs for this domain are already in context (above this prompt), do NOT re-run discovery — report what's already known and ask the user if they want to update a specific area. Only run a fresh probe if: no specs exist, the user explicitly asks to re-map, or an existing spec's selectors are failing.
+
+If discovery IS needed:
 1. Run a single `execute_script` DOM probe targeting: primary content first (the thing that makes this site useful — recipe cards, product listings, article body, search results), then chrome (nav, search, sidebar, footer)
 2. For each region: the most stable selector (`[data-testid]` > `[aria-label]` > semantic > class), element count, and a one-line description
 3. Save as site specs via `save_site_spec` — one spec per logical area (e.g. "Navigation", "Recipe Card", "Article Listings")
