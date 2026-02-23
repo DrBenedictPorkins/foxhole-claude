@@ -368,6 +368,25 @@ function createViewAsHtmlButton(markdownContent, filename) {
         saveAs: false
       });
 
+      // Wait for the file to be fully written before opening
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Download timeout')), 10000);
+        const listener = (delta) => {
+          if (delta.id === downloadId && delta.state) {
+            if (delta.state.current === 'complete') {
+              clearTimeout(timeout);
+              browser.downloads.onChanged.removeListener(listener);
+              resolve();
+            } else if (delta.state.current === 'interrupted') {
+              clearTimeout(timeout);
+              browser.downloads.onChanged.removeListener(listener);
+              reject(new Error('Download interrupted'));
+            }
+          }
+        };
+        browser.downloads.onChanged.addListener(listener);
+      });
+
       URL.revokeObjectURL(blobUrl);
 
       // Auto-open the saved file
