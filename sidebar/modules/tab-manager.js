@@ -398,6 +398,66 @@ function reattachChatEventListeners(chatContainer, callbacks) {
       newItem.classList.toggle('expanded');
     });
   });
+
+  // Re-attach open file button listeners (Open and Open HTML buttons)
+  chatContainer.querySelectorAll('.open-file-btn').forEach(btn => {
+    const downloadId = parseInt(btn.dataset.downloadId);
+    const resetLabel = btn.dataset.label || '📄 Open';
+    const newBtn = btn.cloneNode(true);
+    btn.parentNode.replaceChild(newBtn, btn);
+    newBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      try {
+        newBtn.textContent = 'Opening...';
+        newBtn.disabled = true;
+        await browser.downloads.open(downloadId);
+        newBtn.textContent = '✓ Opened';
+        setTimeout(() => { newBtn.innerHTML = resetLabel; newBtn.disabled = false; }, 1500);
+      } catch (err) {
+        try {
+          await browser.downloads.show(downloadId);
+          newBtn.textContent = '✓ In Finder';
+          setTimeout(() => { newBtn.innerHTML = resetLabel; newBtn.disabled = false; }, 1500);
+        } catch (showErr) {
+          newBtn.textContent = '✗ Failed';
+          newBtn.style.background = '#f87171';
+          setTimeout(() => {
+            newBtn.innerHTML = resetLabel;
+            newBtn.style.background = '';
+            newBtn.disabled = false;
+          }, 2000);
+        }
+      }
+    });
+  });
+
+  // Re-attach copy URL button listeners
+  chatContainer.querySelectorAll('.copy-url-btn').forEach(btn => {
+    const fileUrl = btn.dataset.fileUrl;
+    const filePath = btn.dataset.filePath;
+    const newBtn = btn.cloneNode(true);
+    btn.parentNode.replaceChild(newBtn, btn);
+    newBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const url = fileUrl || `file://${filePath}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        newBtn.textContent = '✓ Copied!';
+        newBtn.style.background = '#666';
+        setTimeout(() => { newBtn.innerHTML = '📋 Copy URL'; newBtn.style.background = '#555'; }, 2000);
+      } catch (err) {
+        console.error('Copy failed:', err);
+      }
+    });
+  });
+
+  // Re-attach view-as-html button listeners by recreating from stored data attributes
+  chatContainer.querySelectorAll('.view-html-btn').forEach(btn => {
+    const markdownContent = btn.dataset.markdownContent;
+    const filename = btn.dataset.filename;
+    const newBtn = window.ActivityLog.createViewAsHtmlButton(markdownContent, filename);
+    btn.parentNode.replaceChild(newBtn, btn);
+  });
 }
 
 // Export functions for use in sidebar.js
