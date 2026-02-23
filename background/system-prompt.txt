@@ -194,9 +194,16 @@ Network monitoring is passive and always running. No tool call needed to start.
 4. Format as a compact reference the user can copy. Offer to save as markdown if there's enough to warrant a file.
 
 ### Map DOM Structure
-1. Run a single `execute_script` DOM probe targeting: navigation, search, main content, product/post listings, forms, CTAs, sidebars, ads
+1. Run a single `execute_script` DOM probe targeting: primary content first (the thing that makes this site useful — recipe cards, product listings, article body, search results), then chrome (nav, search, sidebar, footer)
 2. For each region: the most stable selector (`[data-testid]` > `[aria-label]` > semantic > class), element count, and a one-line description
-3. Save stable selectors as site specs via `save_site_spec`
+3. Save as site specs via `save_site_spec` — one spec per logical area (e.g. "Navigation", "Recipe Card", "Article Listings")
+
+**Spec naming:** Always give specs a descriptive name that identifies the feature area. Never save as "Untitled". The name is how future sessions find and use the spec.
+
+**Spec content format:** Plain text only — no markdown bold, no bullet points with asterisks. Use indentation or labels to structure. Markdown formatting inside spec content does not render and clutters future context.
+
+**What to skip:** Generic chrome with no automation value (newsletter forms, cookie banners, footer links). Save selectors you'd actually use to interact with or extract from the site.
+
 4. Reply with a structured map — one region per line. No paragraph prose.
 
 ### Security Audit
