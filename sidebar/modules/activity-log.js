@@ -203,6 +203,9 @@ function createDownloadButtons(result, insertAfterElement) {
 function createOpenButton(downloadId) {
   const openBtn = document.createElement('button');
   openBtn.innerHTML = '📄 Open';
+  openBtn.className = 'open-file-btn';
+  openBtn.dataset.downloadId = String(downloadId);
+  openBtn.dataset.label = '📄 Open';
   openBtn.style.cssText = 'flex: 1; padding: 10px 16px; background: #C4A052; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600;';
 
   openBtn.addEventListener('click', async (e) => {
@@ -251,6 +254,9 @@ function createOpenButton(downloadId) {
 function createCopyUrlButton(fileUrl, filePath) {
   const copyBtn = document.createElement('button');
   copyBtn.innerHTML = '📋 Copy URL';
+  copyBtn.className = 'copy-url-btn';
+  copyBtn.dataset.fileUrl = fileUrl || '';
+  copyBtn.dataset.filePath = filePath || '';
   copyBtn.style.cssText = 'padding: 10px 16px; background: #555; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
 
   copyBtn.addEventListener('click', async (e) => {
@@ -283,22 +289,52 @@ function createCopyUrlButton(fileUrl, filePath) {
 function createViewAsHtmlButton(markdownContent, filename) {
   const htmlBtn = document.createElement('button');
   htmlBtn.innerHTML = '🌐 View as HTML';
+  htmlBtn.className = 'view-html-btn';
   htmlBtn.style.cssText = 'padding: 10px 16px; background: #4a7c59; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
+  htmlBtn.dataset.markdownContent = markdownContent;
+  htmlBtn.dataset.filename = filename || '';
 
   htmlBtn.addEventListener('click', async (e) => {
     e.stopPropagation();
+
+    // State 2: already downloaded — re-open in Firefox tab
+    if (htmlBtn.dataset.downloadId) {
+      const fileUrl = htmlBtn.dataset.fileUrl;
+      try {
+        htmlBtn.textContent = 'Opening...';
+        htmlBtn.disabled = true;
+        if (fileUrl) {
+          await browser.tabs.create({ url: fileUrl });
+        } else {
+          await browser.downloads.open(parseInt(htmlBtn.dataset.downloadId));
+        }
+        htmlBtn.textContent = '✓ Opened';
+        setTimeout(() => {
+          htmlBtn.innerHTML = '🌐 View as HTML';
+          htmlBtn.disabled = false;
+        }, 1500);
+      } catch (err) {
+        htmlBtn.textContent = '✗ Failed';
+        htmlBtn.style.background = '#f87171';
+        setTimeout(() => {
+          htmlBtn.innerHTML = '🌐 View as HTML';
+          htmlBtn.style.background = '#4a7c59';
+          htmlBtn.disabled = false;
+        }, 2000);
+      }
+      return;
+    }
+
+    // State 1: convert markdown to HTML and download as file
     try {
       htmlBtn.textContent = 'Converting...';
       htmlBtn.disabled = true;
 
-      // Convert markdown to HTML using marked (loaded globally in sidebar)
       let htmlContent;
       try {
         if (typeof marked !== 'undefined' && marked.parse) {
           htmlContent = marked.parse(markdownContent);
         } else {
-          console.warn('marked library not available, using basic conversion');
-          // Fallback: basic conversion
           htmlContent = markdownContent
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
@@ -314,71 +350,70 @@ function createViewAsHtmlButton(markdownContent, filename) {
           .replace(/\n/g, '<br>');
       }
 
-      // Create full HTML document with styling
       const title = filename ? filename.replace(/\.md$/i, '') : 'Claude Report';
-      const fullHtml = `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${title}</title>
-<style>
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 40px 20px;
-  background: #1a1a1a;
-  color: #e0e0e0;
-  line-height: 1.6;
-}
-h1, h2, h3, h4 { color: #fff; margin-top: 1.5em; }
-h1 { border-bottom: 2px solid #444; padding-bottom: 0.5em; }
-h2 { border-bottom: 1px solid #333; padding-bottom: 0.3em; }
-table { border-collapse: collapse; width: 100%; margin: 20px 0; }
-th, td { border: 1px solid #444; padding: 12px; text-align: left; }
-th { background: #333; color: #fff; }
-tr:nth-child(even) { background: #252525; }
-code { background: #333; padding: 2px 6px; border-radius: 3px; font-family: 'SF Mono', Monaco, monospace; }
-pre { background: #2d2d2d; padding: 16px; border-radius: 8px; overflow-x: auto; border: 1px solid #444; }
-pre code { background: none; padding: 0; }
-a { color: #6db3f2; }
-blockquote { border-left: 4px solid #444; margin: 1em 0; padding-left: 1em; color: #aaa; }
-ul, ol { padding-left: 2em; }
-li { margin: 0.5em 0; }
-hr { border: none; border-top: 1px solid #444; margin: 2em 0; }
-</style>
-</head>
-<body>
-${htmlContent}
-</body>
-</html>`;
+      const fullHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>${title}</title><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:900px;margin:0 auto;padding:40px 20px;background:#1a1a1a;color:#e0e0e0;line-height:1.6}h1,h2,h3,h4{color:#fff;margin-top:1.5em}h1{border-bottom:2px solid #444;padding-bottom:.5em}h2{border-bottom:1px solid #333;padding-bottom:.3em}table{border-collapse:collapse;width:100%;margin:20px 0}th,td{border:1px solid #444;padding:12px;text-align:left}th{background:#333;color:#fff}tr:nth-child(even){background:#252525}code{background:#333;padding:2px 6px;border-radius:3px;font-family:'SF Mono',Monaco,monospace}pre{background:#2d2d2d;padding:16px;border-radius:8px;overflow-x:auto;border:1px solid #444}pre code{background:none;padding:0}a{color:#6db3f2}blockquote{border-left:4px solid #444;margin:1em 0;padding-left:1em;color:#aaa}ul,ol{padding-left:2em}li{margin:.5em 0}hr{border:none;border-top:1px solid #444;margin:2em 0}</style></head><body>${htmlContent}</body></html>`;
 
-      // Create blob and open in new tab
+      const htmlFilename = filename ? filename.replace(/\.md$/i, '.html') : 'claude-report.html';
       const blob = new Blob([fullHtml], { type: 'text/html' });
       const blobUrl = URL.createObjectURL(blob);
 
-      // Fire-and-forget: don't await — browser.tabs.create can hang from sidebar context
-      let opened = false;
-      try {
-        browser.tabs.create({ url: blobUrl });
-        opened = true;
-      } catch (tabErr) {
-        console.error('tabs.create failed:', tabErr);
+      const downloadId = await browser.downloads.download({
+        url: blobUrl,
+        filename: htmlFilename,
+        saveAs: false
+      });
+
+      // Wait for the file to be fully written before opening
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Download timeout')), 10000);
+        const listener = (delta) => {
+          if (delta.id === downloadId && delta.state) {
+            if (delta.state.current === 'complete') {
+              clearTimeout(timeout);
+              browser.downloads.onChanged.removeListener(listener);
+              resolve();
+            } else if (delta.state.current === 'interrupted') {
+              clearTimeout(timeout);
+              browser.downloads.onChanged.removeListener(listener);
+              reject(new Error('Download interrupted'));
+            }
+          }
+        };
+        browser.downloads.onChanged.addListener(listener);
+      });
+
+      URL.revokeObjectURL(blobUrl);
+
+      // Get the file:// path and open in Firefox tab
+      const [downloadInfo] = await browser.downloads.search({ id: downloadId });
+      const filePath = downloadInfo?.filename;
+      const fileUrl = filePath ? `file://${filePath}` : null;
+
+      htmlBtn.textContent = 'Opening...';
+      if (fileUrl) {
+        await browser.tabs.create({ url: fileUrl });
+      } else {
+        try {
+          await browser.downloads.open(downloadId);
+        } catch (openErr) {
+          await browser.downloads.show(downloadId);
+        }
       }
 
-      // Update button immediately (don't wait for tab)
-      htmlBtn.textContent = opened ? '✓ Opened' : '✗ Failed';
+      // Transform to State 2: subsequent clicks re-open the same file
+      htmlBtn.className = 'open-file-btn';
+      htmlBtn.dataset.downloadId = String(downloadId);
+      htmlBtn.dataset.label = '🌐 View as HTML';
+      htmlBtn.dataset.fileUrl = fileUrl || '';
+      delete htmlBtn.dataset.markdownContent;
+      htmlBtn.textContent = '✓ Opened';
       setTimeout(() => {
         htmlBtn.innerHTML = '🌐 View as HTML';
         htmlBtn.disabled = false;
       }, 1500);
 
-      // Clean up blob URL after tab has had time to load
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
-
     } catch (err) {
-      console.error('HTML conversion failed:', err);
+      console.error('HTML download failed:', err);
       htmlBtn.textContent = '✗ Failed';
       htmlBtn.style.background = '#f87171';
       htmlBtn.disabled = false;

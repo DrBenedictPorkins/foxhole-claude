@@ -62,7 +62,7 @@ Specs get age badges in prompt formatting (`site-knowledge.js:formatForPrompt`):
 - **3-8 weeks** — `[aging]`
 - **> 2 months** — `[STALE — verify before using]`
 
-Each spec shows its `spec_id` so Claude can delete broken ones with `delete_site_spec`.
+Each spec shows its `spec_id` as a `#xxxx` suffix at the end of the spec heading so Claude can delete broken ones with `delete_site_spec`.
 
 ### Profile rendering
 
@@ -141,6 +141,7 @@ Extension is submitted to addons.mozilla.org from `master` branch.
 
 - No build step — raw JS/CSS/HTML loaded directly by Firefox
 - State stored in `browser.storage.local`
+- Sidebar conversation state persisted across close/reopen as `foxhole_sidebar_state` in `browser.storage.local` (24h TTL, base64 images and image content blocks stripped to manage size)
 - CSS uses custom properties defined in `:root` in `sidebar.css`
 - No generic `.hidden` utility class — use scoped `.modal.hidden` or `style.display`
 - Token display has visual tiers at 50k/100k/150k cumulative tokens
@@ -148,7 +149,13 @@ Extension is submitted to addons.mozilla.org from `master` branch.
 - Any tool returning `result.screenshot` (a data URL) gets converted to a Claude vision image block in `background.js` — universal image pipeline
 - Screenshots stored in `docs/screenshots/`, named with numeric prefix for sort order
 - Spec content is backtick-escaped (`\u200B`) at save time to prevent code fence breakout in prompt formatting
+- Visual Selection tracks selected elements in a JS `Set` (source of truth) + `MutationObserver` to re-apply `data-user-selected` when SPAs (React/Vue) wipe DOM attributes on re-render
+- `STREAM_DELTA` messages are excluded from the sidebar console log (fires per streaming token — too noisy); all other message types still log
 
 ## Testing
 
 No automated tests. Manual testing in Firefox via `about:debugging` > Load Temporary Add-on.
+
+## Pending
+
+- **Debug logging flag** — add `debugLogging` toggle to options page; replace `console.log` with `debugLog()` helper in `sidebar/sidebar.js`, `background/background.js`, and `content/content.js`; sync at runtime via `browser.storage.onChanged`; `console.error` stays unconditional

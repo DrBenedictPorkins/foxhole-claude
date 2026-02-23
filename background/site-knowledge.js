@@ -234,9 +234,12 @@ async function add(domain, item) {
     knowledge[domain] = [];
   }
 
-  // Check for duplicate by title (case-insensitive)
+  // Check for duplicate by title (case-insensitive) or near-identical content
+  const normalizeContent = s => (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const newContent = normalizeContent(item.content);
   const isDuplicate = knowledge[domain].some(existing =>
-    existing.title.toLowerCase() === item.title.toLowerCase()
+    existing.title.toLowerCase() === item.title.toLowerCase() ||
+    (newContent.length > 20 && normalizeContent(existing.content) === newContent)
   );
 
   if (isDuplicate) {
@@ -635,34 +638,25 @@ function formatForPrompt(items, domain) {
     text += '\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\n';
   }
 
-  text += '======================================================================\n';
-  text += '  KNOWN PATTERNS — use these first, but verify if stale\n';
-  text += '======================================================================\n\n';
-  text += `## PATTERNS FOR ${domain.toUpperCase()}\n\n`;
-  text += '**Newest first. If two conflict, follow the newer one.**\n';
-  text += '**If a spec fails (selector missing, endpoint 404), delete it with delete_site_spec and save a corrected one.**\n\n';
+  text += `## SITE SPECS — ${domain.toUpperCase()} (newest first; on conflict use newer)\n\n`;
 
   for (const item of rest) {
     const age = getRelativeAge(item.created);
     const typeBadge = item.type ? `[${item.type}]` : '';
 
-    // Staleness warning based on age
     const diffDays = item.created ? Math.floor((Date.now() - item.created) / 86400000) : 0;
     let staleBadge = '';
     if (diffDays > 60) {
       staleBadge = ' [STALE — verify before using]';
     } else if (diffDays > 21) {
-      staleBadge = ' [aging — may need refresh]';
+      staleBadge = ' [aging]';
     }
 
-    text += `### ${item.title} ${typeBadge} ${age ? `(${age})` : ''}${staleBadge}\n`;
-    if (item.id) {
-      text += `*spec_id: ${item.id}*\n`;
-    }
-    text += '\n';
+    // spec_id inlined in heading — Claude needs it to call delete_site_spec on any spec
+    const idSuffix = item.id ? ` #${item.id}` : '';
+    text += `### ${item.title} ${typeBadge} ${age ? `(${age})` : ''}${staleBadge}${idSuffix}\n`;
 
     if (item.content) {
-      // Escape triple backticks in content to prevent code fence breakout
       const escapedContent = item.content.replace(/```/g, '`\u200B``');
       text += '```\n' + escapedContent + '\n```\n\n';
     }
@@ -670,11 +664,7 @@ function formatForPrompt(items, domain) {
     if (item.selector) {
       text += `**Selector:** \`${item.selector}\`\n\n`;
     }
-
-    text += '---\n\n';
   }
-
-  text += '**REMINDER: Stale specs waste turns. If something fails, delete + re-save rather than working around it.**\n\n';
 
   return text;
 }

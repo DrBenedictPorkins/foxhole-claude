@@ -247,6 +247,34 @@
 
   let selectionModeActive = false;
   let hoveredElement = null;
+  let selectedElements = new Set();
+  let selectionObserver = null;
+
+  function startSelectionObserver() {
+    if (selectionObserver) return;
+    selectionObserver = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.type === 'attributes' && mutation.attributeName === 'data-user-selected') {
+          const el = mutation.target;
+          if (selectedElements.has(el) && el.isConnected && !el.hasAttribute('data-user-selected')) {
+            el.setAttribute('data-user-selected', 'true');
+          }
+        }
+      }
+    });
+    selectionObserver.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['data-user-selected'],
+      subtree: true
+    });
+  }
+
+  function stopSelectionObserver() {
+    if (selectionObserver) {
+      selectionObserver.disconnect();
+      selectionObserver = null;
+    }
+  }
 
   function enterSelectionMode() {
     if (selectionModeActive) return { alreadyActive: true };
@@ -268,6 +296,8 @@
     document.addEventListener('click', handleSelectionClick, true);
     document.addEventListener('keydown', handleSelectionEscape);
 
+    startSelectionObserver();
+
     return { active: true, message: 'Selection mode activated. Click elements to mark them. Press Escape to exit.' };
   }
 
@@ -287,9 +317,8 @@
       hoveredElement = null;
     }
 
-    // Count what was selected
-    const selected = document.querySelectorAll('[data-user-selected="true"]');
-    return { active: false, selectedCount: selected.length, message: `Selection mode deactivated. ${selected.length} element(s) selected.` };
+    const activeCount = [...selectedElements].filter(el => el.isConnected).length;
+    return { active: false, selectedCount: activeCount, message: `Selection mode deactivated. ${activeCount} element(s) selected.` };
   }
 
   function handleSelectionHover(e) {
@@ -311,10 +340,12 @@
     e.stopPropagation();
 
     const el = e.target;
-    // Toggle selection
-    if (el.getAttribute('data-user-selected') === 'true') {
+    // Toggle selection — Set is the source of truth, attribute is visual only
+    if (selectedElements.has(el)) {
+      selectedElements.delete(el);
       el.removeAttribute('data-user-selected');
     } else {
+      selectedElements.add(el);
       el.setAttribute('data-user-selected', 'true');
     }
   }
@@ -326,7 +357,7 @@
       try {
         browser.runtime.sendMessage({
           type: 'selection_mode_exited',
-          selectedCount: document.querySelectorAll('[data-user-selected="true"]').length
+          selectedCount: [...selectedElements].filter(el => el.isConnected).length
         }).catch(() => {});
       } catch (err) {
         // Ignore
@@ -336,9 +367,10 @@
 
   function getUserSelections(params = {}) {
     const { include_html = false, include_text = true, include_parent = true } = params;
-    const elements = document.querySelectorAll('[data-user-selected="true"]');
+    // Read from Set (source of truth); filter detached nodes from React/SPA unmounts
+    const elements = [...selectedElements].filter(el => el.isConnected);
 
-    const items = Array.from(elements).map((el, index) => {
+    const items = elements.map((el, index) => {
       const item = {
         index,
         tag: el.tagName.toLowerCase(),
@@ -430,12 +462,15 @@
   }
 
   function clearUserSelections() {
-    const elements = document.querySelectorAll('[data-user-selected="true"]');
     let cleared = 0;
-    elements.forEach(el => {
-      el.removeAttribute('data-user-selected');
-      cleared++;
-    });
+    for (const el of selectedElements) {
+      if (el.isConnected) {
+        el.removeAttribute('data-user-selected');
+        cleared++;
+      }
+    }
+    selectedElements.clear();
+    stopSelectionObserver();
     return { cleared };
   }
 
@@ -606,6 +641,10 @@
 
       case 'clear_user_selections':
         return clearUserSelections();
+
+      // Clean text (remove excessive blank lines)
+      case 'clean_text':
+        return handleCleanText(params);
 
       // IndexedDB and Cache Storage
       case 'list_indexeddb':
@@ -1146,6 +1185,130 @@
     }
 
     return { success: true, filled: true, fieldCount: Object.keys(fields).length, results };
+  }
+
+  // ==========================================================================
+  // Clean Text Handler
+  // ==========================================================================
+
+  /**
+   * Set value on a textarea/input using the native prototype setter.
+   * This bypasses React/Vue/Angular property overrides so the framework
+   * sees the change and syncs it to state (and ultimately to the server).
+   */
+  function setNativeValue(el, value) {
+    const proto = el.tagName === 'TEXTAREA'
+      ? HTMLTextAreaElement.prototype
+      : HTMLInputElement.prototype;
+    const nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+    if (nativeSetter) {
+      nativeSetter.call(el, value);
+    } else {
+      el.value = value;
+    }
+  }
+
+  /**
+   * Fire the full sequence of events that frameworks and autosave handlers
+   * listen for: InputEvent (with inputType for modern handlers), then
+   * change, then blur+focus to trigger on-blur save hooks without
+   * actually losing focus visually.
+   */
+  function fireChangeEvents(el) {
+    // InputEvent with inputType — React 17+, modern frameworks
+    el.dispatchEvent(new InputEvent('input', {
+      bubbles: true,
+      cancelable: true,
+      inputType: 'insertFromPaste' // closest semantic for bulk text replacement
+    }));
+    // change — classic HTML forms, jQuery, Angular.js
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    // blur+focus cycle — triggers onBlur autosave (Notion, Confluence, etc.)
+    el.dispatchEvent(new Event('blur', { bubbles: true }));
+    el.dispatchEvent(new Event('focus', { bubbles: true }));
+  }
+
+  function handleCleanText() {
+    const el = document.activeElement;
+    if (!el) {
+      return { success: false, error: 'No focused element' };
+    }
+
+    // Handle <textarea> and <input> elements
+    if (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && el.type === 'text')) {
+      const start = el.selectionStart;
+      const end = el.selectionEnd;
+      const hasSelection = start !== end;
+
+      let original, cleaned, newValue;
+      if (hasSelection) {
+        original = el.value.substring(start, end);
+        cleaned = original.replace(/\n{3,}/g, '\n\n');
+        newValue = el.value.substring(0, start) + cleaned + el.value.substring(end);
+      } else {
+        original = el.value;
+        cleaned = original.replace(/\n{3,}/g, '\n\n');
+        newValue = cleaned;
+      }
+
+      if (original === cleaned) {
+        return { success: true, cleaned: false, linesRemoved: 0 };
+      }
+
+      // Use native setter so React/Vue detect the change
+      setNativeValue(el, newValue);
+
+      // Restore cursor / selection
+      if (hasSelection) {
+        el.selectionStart = start;
+        el.selectionEnd = start + cleaned.length;
+      }
+
+      fireChangeEvents(el);
+
+      const linesRemoved = original.length - cleaned.length;
+      return { success: true, cleaned: true, linesRemoved };
+    }
+
+    // Handle contentEditable elements (Gmail, Notion, Confluence, etc.)
+    if (el.isContentEditable) {
+      const selection = window.getSelection();
+      const hasSelection = selection && selection.toString().length > 0;
+
+      if (hasSelection) {
+        const selectedText = selection.toString();
+        const cleaned = selectedText.replace(/\n{3,}/g, '\n\n');
+        if (selectedText === cleaned) {
+          return { success: true, cleaned: false, linesRemoved: 0 };
+        }
+        // Use execCommand so the edit enters the undo stack and
+        // rich-text editors (Draft.js, ProseMirror, Tiptap) pick it up
+        document.execCommand('insertText', false, cleaned);
+        fireChangeEvents(el);
+        const linesRemoved = selectedText.length - cleaned.length;
+        return { success: true, cleaned: true, linesRemoved };
+      }
+
+      // No selection — select all content, then replace
+      const original = el.innerText;
+      const cleaned = original.replace(/\n{3,}/g, '\n\n');
+      if (original === cleaned) {
+        return { success: true, cleaned: false, linesRemoved: 0 };
+      }
+
+      // Select all content in the editable, then replace via execCommand
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      document.execCommand('insertText', false, cleaned);
+      fireChangeEvents(el);
+
+      const linesRemoved = original.length - cleaned.length;
+      return { success: true, cleaned: true, linesRemoved };
+    }
+
+    return { success: false, error: 'Focused element is not a text input or contentEditable' };
   }
 
   // ==========================================================================

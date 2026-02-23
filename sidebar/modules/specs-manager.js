@@ -145,7 +145,7 @@ function createSpecsManager(elements, sendMessage) {
 
     // Header with title and actions
     html += '<div class="note-header">';
-    const title = spec.goal || spec.description || 'Untitled Spec';
+    const title = spec.title || spec.goal || spec.description || 'Untitled Spec';
     html += `<h3 class="note-title">${window.RenderUtils.escapeHtml(title)}</h3>`;
     html += '<div class="note-actions">';
     if (spec.type) {
@@ -214,7 +214,7 @@ function createSpecsManager(elements, sendMessage) {
    */
   function generateSpecMarkdown(spec) {
     let md = '';
-    const title = spec.goal || spec.description || 'Untitled Spec';
+    const title = spec.title || spec.goal || spec.description || 'Untitled Spec';
 
     md += `## ${title}`;
     if (spec.type) {

@@ -529,6 +529,10 @@ async function executeTool(toolName, toolInput) {
       case 'delete_history':
         return await handleDeleteHistory(toolInput);
 
+      // Text Utilities
+      case 'clean_text':
+        return await sendToContentScript(tabId, 'clean_text', toolInput);
+
       // Developer Tools
       case 'detect_page_tech':
         return await handleDetectPageTech(tabId);

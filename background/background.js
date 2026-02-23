@@ -91,7 +91,25 @@
     setupMessageListeners();
     setupBrowserAction();
     setupTabCleanup();
+    setupCommandListeners();
     console.log('Foxhole for Claude background script initialized');
+  }
+
+  // Listen for keyboard shortcut commands
+  function setupCommandListeners() {
+    browser.commands.onCommand.addListener(async (command) => {
+      if (command === 'clean-text') {
+        try {
+          const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+          if (tab?.id) {
+            const result = await browser.tabs.sendMessage(tab.id, { action: 'clean_text', params: {} }, { frameId: 0 });
+            console.log('[CleanText] Result:', result);
+          }
+        } catch (error) {
+          console.error('[CleanText] Error:', error);
+        }
+      }
+    });
   }
 
   // Clean up per-tab state when tabs are closed
@@ -1033,6 +1051,12 @@
 
       case 'clear_cache_storage':
         return `[clear_cache_storage] Deleted ${(result.deleted || []).length} cache(s)`;
+
+      case 'clean_text':
+        if (result.cleaned) {
+          return `[clean_text] Removed ${result.linesRemoved} excess newline chars`;
+        }
+        return `[clean_text] No changes needed`;
 
       case 'search_history': {
         const histCount = result.results?.length || 0;
