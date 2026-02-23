@@ -9,12 +9,14 @@ Instead of rediscovering the same selectors, endpoints, and interaction patterns
 ## What makes this different
 
 - **Site profiles** — Claude detects whether a site is UI-driven (React SPA), API-driven, or hybrid, and saves that as a profile. Next visit, it knows the interaction model upfront.
-- **Persistent site specs** — Working selectors, API endpoints, storage keys, and workflows are saved per-domain and injected into every conversation on that site.
-- **Spec staleness** — Old specs get flagged. Claude can delete broken ones and save corrected versions instead of working around stale knowledge.
+- **Persistent site specs** — Working selectors, API endpoints, storage keys, and multi-step workflows are saved per-domain and injected into every conversation on that site. Five types: `profile`, `dom`, `api`, `storage`, `shortcut`.
+- **Spec staleness** — Specs are age-badged (`[aging]` > 3 weeks, `[STALE]` > 2 months). Claude can delete broken ones and save corrected versions instead of working around stale knowledge.
+- **Passive API observer** — Every XHR/fetch is recorded per domain in the background without any action needed. Claude can query captured endpoints, auth header patterns, and payload shapes directly via `get_network_requests`.
 - **Assistant, not automation** — Claude asks you to handle age gates, logins, CAPTCHAs, and location selectors instead of flailing through them. One click from you beats five tool calls.
 - **First-visit discovery** — On new sites, Claude probes the DOM for the framework, checks API observer data, and determines the interaction mode before guessing.
 - **Prompt injection defense** — Page content is sanitized, marked as untrusted, and wrapped in boundaries before Claude sees it.
 - **Context compression** — Screenshots and raw payloads are replaced with semantic summaries in older turns so conversations stay within context limits.
+- **Sidebar persistence** — Conversation state per tab survives sidebar close/reopen (24h TTL, screenshots stripped).
 
 ## Install
 
@@ -50,7 +52,13 @@ Requires your own [Anthropic API key](https://console.anthropic.com/).
 | Marking | `mark_elements` `get_marked_elements` `clear_marked_elements` |
 | Selection | `toggle_selection_mode` `get_user_selections` `clear_user_selections` |
 
-Two autonomy modes: **confirm risky actions** (default) or **skip all confirmations**.
+## Autonomy and action limits
+
+**Risky tools** (`click_element`, `type_text`, `navigate`, `execute_script`, `fill_form`, `press_key`) require confirmation by default — each call shows its parameters before executing. Configurable in Settings; can also be toggled per-session from the toolbar.
+
+**Skip all confirmations** mode removes all prompts. Indicated by a warning banner in the sidebar.
+
+**Iteration limit** — Claude is interrupted after a configurable number of consecutive tool calls and prompted to continue (+10, unlimited) or stop. Prevents runaway loops without killing the session.
 
 ## Architecture
 
