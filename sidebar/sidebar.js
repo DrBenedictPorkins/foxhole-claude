@@ -1067,7 +1067,8 @@
 
     // Handle pending tab switch
     const tabToSwitchTo = pendingTabSwitch;
-    const hadTools = currentStreamingTools.length > 0;
+    const activityItems = activityLog?.querySelectorAll('.activity-item');
+    const hadTools = currentStreamingTools.length > 0 || (activityItems && activityItems.length > 0);
     const wasReportPrompt = reportPromptPending;
     reportPromptPending = false;
     resetStreamingState();
