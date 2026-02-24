@@ -402,13 +402,13 @@ function reattachChatEventListeners(chatContainer, callbacks) {
   // Re-attach open file button listeners (Open and Open HTML buttons)
   chatContainer.querySelectorAll('.open-file-btn').forEach(btn => {
     const downloadId = parseInt(btn.dataset.downloadId);
-    const resetLabel = btn.dataset.label || '📄 Open';
+    const resetLabel = btn.dataset.label || 'Open';
     const newBtn = btn.cloneNode(true);
     btn.parentNode.replaceChild(newBtn, btn);
     // Reset any transient state (button may have been serialized mid-click)
     newBtn.innerHTML = resetLabel;
     newBtn.disabled = false;
-    newBtn.style.background = '';
+    newBtn.style.background = resetLabel.includes('HTML') ? '#4a7c59' : '#C4A052';
     const fileUrl = newBtn.dataset.fileUrl;
     newBtn.addEventListener('click', async (e) => {
       e.stopPropagation();
@@ -435,7 +435,7 @@ function reattachChatEventListeners(chatContainer, callbacks) {
         newBtn.style.background = '#f87171';
         setTimeout(() => {
           newBtn.innerHTML = resetLabel;
-          newBtn.style.background = '';
+          newBtn.style.background = resetLabel.includes('HTML') ? '#4a7c59' : '#C4A052';
           newBtn.disabled = false;
         }, 2000);
       }
@@ -448,8 +448,8 @@ function reattachChatEventListeners(chatContainer, callbacks) {
     const filePath = btn.dataset.filePath;
     const newBtn = btn.cloneNode(true);
     btn.parentNode.replaceChild(newBtn, btn);
-    newBtn.innerHTML = '📋 Copy URL';
-    newBtn.style.background = '';
+    newBtn.innerHTML = 'Copy URL';
+    newBtn.style.background = '#555';
     newBtn.addEventListener('click', async (e) => {
       e.stopPropagation();
       const url = fileUrl || `file://${filePath}`;
@@ -457,7 +457,7 @@ function reattachChatEventListeners(chatContainer, callbacks) {
         await navigator.clipboard.writeText(url);
         newBtn.textContent = '✓ Copied!';
         newBtn.style.background = '#666';
-        setTimeout(() => { newBtn.innerHTML = '📋 Copy URL'; newBtn.style.background = '#555'; }, 2000);
+        setTimeout(() => { newBtn.innerHTML = 'Copy URL'; newBtn.style.background = '#555'; }, 2000);
       } catch (err) {
         console.error('Copy failed:', err);
       }

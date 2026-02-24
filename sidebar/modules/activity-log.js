@@ -202,10 +202,10 @@ function createDownloadButtons(result, insertAfterElement) {
  */
 function createOpenButton(downloadId) {
   const openBtn = document.createElement('button');
-  openBtn.innerHTML = '📄 Open';
+  openBtn.innerHTML = 'Open';
   openBtn.className = 'open-file-btn';
   openBtn.dataset.downloadId = String(downloadId);
-  openBtn.dataset.label = '📄 Open';
+  openBtn.dataset.label = 'Open';
   openBtn.style.cssText = 'flex: 1; padding: 10px 16px; background: #C4A052; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600;';
 
   openBtn.addEventListener('click', async (e) => {
@@ -217,7 +217,7 @@ function createOpenButton(downloadId) {
       openBtn.textContent = '✓ Opened';
       // Re-enable after brief feedback
       setTimeout(() => {
-        openBtn.innerHTML = '📄 Open';
+        openBtn.innerHTML = 'Open';
         openBtn.disabled = false;
       }, 1500);
     } catch (err) {
@@ -226,14 +226,14 @@ function createOpenButton(downloadId) {
         await browser.downloads.show(downloadId);
         openBtn.textContent = '✓ In Finder';
         setTimeout(() => {
-          openBtn.innerHTML = '📄 Open';
+          openBtn.innerHTML = 'Open';
           openBtn.disabled = false;
         }, 1500);
       } catch (err2) {
         openBtn.textContent = '✗ Failed';
         openBtn.style.background = '#f87171';
         setTimeout(() => {
-          openBtn.innerHTML = '📄 Open';
+          openBtn.innerHTML = 'Open';
           openBtn.style.background = '#C4A052';
           openBtn.disabled = false;
         }, 2000);
@@ -253,7 +253,7 @@ function createOpenButton(downloadId) {
  */
 function createCopyUrlButton(fileUrl, filePath) {
   const copyBtn = document.createElement('button');
-  copyBtn.innerHTML = '📋 Copy URL';
+  copyBtn.innerHTML = 'Copy URL';
   copyBtn.className = 'copy-url-btn';
   copyBtn.dataset.fileUrl = fileUrl || '';
   copyBtn.dataset.filePath = filePath || '';
@@ -267,7 +267,7 @@ function createCopyUrlButton(fileUrl, filePath) {
       copyBtn.textContent = '✓ Copied!';
       copyBtn.style.background = '#666';
       setTimeout(() => {
-        copyBtn.innerHTML = '📋 Copy URL';
+        copyBtn.innerHTML = 'Copy URL';
         copyBtn.style.background = '#555';
       }, 2000);
     } catch (err) {
@@ -288,7 +288,7 @@ function createCopyUrlButton(fileUrl, filePath) {
  */
 function createViewAsHtmlButton(markdownContent, filename) {
   const htmlBtn = document.createElement('button');
-  htmlBtn.innerHTML = '🌐 View as HTML';
+  htmlBtn.innerHTML = 'View as HTML';
   htmlBtn.className = 'view-html-btn';
   htmlBtn.style.cssText = 'padding: 10px 16px; background: #4a7c59; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
   htmlBtn.dataset.markdownContent = markdownContent;
@@ -296,38 +296,8 @@ function createViewAsHtmlButton(markdownContent, filename) {
 
   htmlBtn.addEventListener('click', async (e) => {
     e.stopPropagation();
-
-    // State 2: already downloaded — re-open in Firefox tab
-    if (htmlBtn.dataset.downloadId) {
-      const fileUrl = htmlBtn.dataset.fileUrl;
-      try {
-        htmlBtn.textContent = 'Opening...';
-        htmlBtn.disabled = true;
-        if (fileUrl) {
-          await browser.tabs.create({ url: fileUrl });
-        } else {
-          await browser.downloads.open(parseInt(htmlBtn.dataset.downloadId));
-        }
-        htmlBtn.textContent = '✓ Opened';
-        setTimeout(() => {
-          htmlBtn.innerHTML = '🌐 View as HTML';
-          htmlBtn.disabled = false;
-        }, 1500);
-      } catch (err) {
-        htmlBtn.textContent = '✗ Failed';
-        htmlBtn.style.background = '#f87171';
-        setTimeout(() => {
-          htmlBtn.innerHTML = '🌐 View as HTML';
-          htmlBtn.style.background = '#4a7c59';
-          htmlBtn.disabled = false;
-        }, 2000);
-      }
-      return;
-    }
-
-    // State 1: convert markdown to HTML and download as file
     try {
-      htmlBtn.textContent = 'Converting...';
+      htmlBtn.textContent = 'Opening...';
       htmlBtn.disabled = true;
 
       let htmlContent;
@@ -353,72 +323,23 @@ function createViewAsHtmlButton(markdownContent, filename) {
       const title = filename ? filename.replace(/\.md$/i, '') : 'Claude Report';
       const fullHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>${title}</title><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:900px;margin:0 auto;padding:40px 20px;background:#1a1a1a;color:#e0e0e0;line-height:1.6}h1,h2,h3,h4{color:#fff;margin-top:1.5em}h1{border-bottom:2px solid #444;padding-bottom:.5em}h2{border-bottom:1px solid #333;padding-bottom:.3em}table{border-collapse:collapse;width:100%;margin:20px 0}th,td{border:1px solid #444;padding:12px;text-align:left}th{background:#333;color:#fff}tr:nth-child(even){background:#252525}code{background:#333;padding:2px 6px;border-radius:3px;font-family:'SF Mono',Monaco,monospace}pre{background:#2d2d2d;padding:16px;border-radius:8px;overflow-x:auto;border:1px solid #444}pre code{background:none;padding:0}a{color:#6db3f2}blockquote{border-left:4px solid #444;margin:1em 0;padding-left:1em;color:#aaa}ul,ol{padding-left:2em}li{margin:.5em 0}hr{border:none;border-top:1px solid #444;margin:2em 0}</style></head><body>${htmlContent}</body></html>`;
 
-      const htmlFilename = filename ? filename.replace(/\.md$/i, '.html') : 'claude-report.html';
-      const blob = new Blob([fullHtml], { type: 'text/html' });
-      const blobUrl = URL.createObjectURL(blob);
+      const key = 'htmlViewer_' + Date.now();
+      await browser.storage.local.set({ [key]: fullHtml });
+      const viewerUrl = browser.runtime.getURL('viewer/viewer.html') + '#' + key;
+      await browser.tabs.create({ url: viewerUrl });
 
-      const downloadId = await browser.downloads.download({
-        url: blobUrl,
-        filename: htmlFilename,
-        saveAs: false
-      });
-
-      // Wait for the file to be fully written before opening
-      await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('Download timeout')), 10000);
-        const listener = (delta) => {
-          if (delta.id === downloadId && delta.state) {
-            if (delta.state.current === 'complete') {
-              clearTimeout(timeout);
-              browser.downloads.onChanged.removeListener(listener);
-              resolve();
-            } else if (delta.state.current === 'interrupted') {
-              clearTimeout(timeout);
-              browser.downloads.onChanged.removeListener(listener);
-              reject(new Error('Download interrupted'));
-            }
-          }
-        };
-        browser.downloads.onChanged.addListener(listener);
-      });
-
-      URL.revokeObjectURL(blobUrl);
-
-      // Get the file:// path and open in Firefox tab
-      const [downloadInfo] = await browser.downloads.search({ id: downloadId });
-      const filePath = downloadInfo?.filename;
-      const fileUrl = filePath ? `file://${filePath}` : null;
-
-      htmlBtn.textContent = 'Opening...';
-      if (fileUrl) {
-        await browser.tabs.create({ url: fileUrl });
-      } else {
-        try {
-          await browser.downloads.open(downloadId);
-        } catch (openErr) {
-          await browser.downloads.show(downloadId);
-        }
-      }
-
-      // Transform to State 2: subsequent clicks re-open the same file
-      htmlBtn.className = 'open-file-btn';
-      htmlBtn.dataset.downloadId = String(downloadId);
-      htmlBtn.dataset.label = '🌐 View as HTML';
-      htmlBtn.dataset.fileUrl = fileUrl || '';
-      delete htmlBtn.dataset.markdownContent;
       htmlBtn.textContent = '✓ Opened';
       setTimeout(() => {
-        htmlBtn.innerHTML = '🌐 View as HTML';
+        htmlBtn.innerHTML = 'View as HTML';
         htmlBtn.disabled = false;
       }, 1500);
-
     } catch (err) {
-      console.error('HTML download failed:', err);
+      console.error('View as HTML failed:', err);
       htmlBtn.textContent = '✗ Failed';
       htmlBtn.style.background = '#f87171';
       htmlBtn.disabled = false;
       setTimeout(() => {
-        htmlBtn.innerHTML = '🌐 View as HTML';
+        htmlBtn.innerHTML = 'View as HTML';
         htmlBtn.style.background = '#4a7c59';
       }, 2000);
     }

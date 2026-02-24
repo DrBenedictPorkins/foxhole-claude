@@ -1,40 +1,32 @@
-// Viewer - reads base64 HTML from URL hash and replaces entire document
+// Viewer - reads HTML from storage using key in URL hash, then renders it
 (function() {
-  try {
-    const hash = window.location.hash.slice(1);
+  const key = window.location.hash.slice(1);
 
-    if (!hash) {
+  if (!key) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('error').style.display = 'block';
+    document.getElementById('error').textContent = 'No content key provided';
+    return;
+  }
+
+  browser.storage.local.get(key).then(result => {
+    const html = result[key];
+    browser.storage.local.remove(key);
+
+    if (!html) {
       document.getElementById('loading').style.display = 'none';
       document.getElementById('error').style.display = 'block';
-      document.getElementById('error').textContent = 'No content provided';
+      document.getElementById('error').textContent = 'Content not found (may have already been opened)';
       return;
     }
 
-    // Decode: base64 -> UTF-8 string -> JSON
-    const jsonStr = decodeURIComponent(escape(atob(hash)));
-    const data = JSON.parse(jsonStr);
-
-    if (!data.html) {
-      document.getElementById('loading').style.display = 'none';
-      document.getElementById('error').style.display = 'block';
-      document.getElementById('error').textContent = 'Invalid content';
-      return;
-    }
-
-    // COMPLETELY replace the document with the HTML
     document.open();
-    document.write(data.html);
+    document.write(html);
     document.close();
 
-    // Update title if provided
-    if (data.title) {
-      document.title = data.title;
-    }
-
-  } catch (e) {
-    console.error('Viewer error:', e);
+  }).catch(e => {
     document.getElementById('loading').style.display = 'none';
     document.getElementById('error').style.display = 'block';
     document.getElementById('error').textContent = 'Error: ' + e.message;
-  }
+  });
 })();
